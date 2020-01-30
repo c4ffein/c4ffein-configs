@@ -1,6 +1,7 @@
 # One script to setup a decent Windows environment from a clean install using Chocolatey, by c4ffein
 
 # Should check certificate
+$certifAlgorithm = 'sha256RSA'
 $certifSubject = 'CN="Chocolatey Software, Inc.", O="Chocolatey Software, Inc.", L=Topeka, S=Kansas, C=US'
 $certifIssuer = 'CN=DigiCert SHA2 Assured ID Code Signing CA, OU=www.digicert.com, O=DigiCert Inc, C=US'
 $certifThumbprint = "4BF7DCBC06F6D0BDFA8A0A78DE0EFB62563C4D87"
@@ -31,9 +32,9 @@ $chocolateyPSUnicodeByteArray = [System.Text.Encoding]::Unicode.GetBytes($chocol
 
 
 Write-Host "Checking Chocolatey install script certificate" -ForegroundColor Red
-# TODO : check crypto algorithm
 $certif = (Get-AuthenticodeSignature -Content $chocolateyPSUnicodeByteArray -SourcePathOrExtension "chocolatey_install.ps1").SignerCertificate
 $certif | Format-List
+FailedIf ($certif.SignatureAlgorithm.FriendlyName -ne $certifAlgorithm) "Certif Algorithm mismatch. Exiting."
 FailedIf ($certif.Subject -ne $certifSubject) "Certif Subject mismatch. Exiting."
 FailedIf ($certif.Issuer -ne $certifIssuer) "Certif Issuer mismatch. Exiting."
 FailedIf ($certif.Thumbprint -ne $certifThumbprint) "Certif Thumbprint mismatch. Exiting."
@@ -44,7 +45,14 @@ iex $chocolateyPSString
 
 
 Write-Host "Installing programs" -ForegroundColor Red
-choco install firefox python atom git -y
+choco install firefox python atom cmder git -y
+
+
+Write-Host "Adding missing shortcuts" -ForegroundColor Red
+# Add to Desktop, as it's too complicated for this script to reliably pin to taskbar in Powershell since latest Windows 10
+Import-Module "$env:ChocolateyInstall\helpers\chocolateyInstaller.psm1"
+Install-ChocolateyShortcut -ShortcutFilePath ([Environment]::GetFolderPath("Desktop")+"\Cmder.lnk") -TargetPath $Env:SYSTEMDRIVE"\tools\Cmder\Cmder.exe"
+Install-ChocolateyShortcut -ShortcutFilePath ([Environment]::GetFolderPath("Desktop")+"\Atom.lnk") -TargetPath $(Convert-Path ($env:LOCALAPPDATA + "\atom\app*\atom.exe"))
 
 
 pause
