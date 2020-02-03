@@ -19,7 +19,7 @@ fi
 tar xv -C "$LOCAL_LIB" -f "/tmp/${PGSQL_TARBALL_NAME}"
 
 "$LOCAL_LIB/pgsql/bin/initdb"
-"$LOCAL_LIB/pgsql/bin/pg_ctl" start
+# "$LOCAL_LIB/pgsql/bin/pg_ctl" start
 # "$LOCAL_LIB/pgsql/bin/psql" -h localhost postgres # to connect
 
 grep -qi PGDATA ~/.bashrc || echo "export PGDATA=$(printf "%q" "$PGDATA")" >> "$HOME/.bashrc"
