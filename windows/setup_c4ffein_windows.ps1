@@ -48,6 +48,10 @@ Write-Host "Installing programs" -ForegroundColor Red
 choco install firefox python atom cmder git -y
 
 
+Write-Host "Installing Python utility packages" -ForegroundColor Red
+pip install magic-wormhole
+
+
 Write-Host "Adding missing shortcuts" -ForegroundColor Red
 # Add to Desktop, as it's too complicated for this script to reliably pin to taskbar in Powershell since latest Windows 10
 Import-Module "$env:ChocolateyInstall\helpers\chocolateyInstaller.psm1"
