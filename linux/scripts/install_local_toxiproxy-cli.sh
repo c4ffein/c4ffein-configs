@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-NAME="toxiproxy"
+NAME="toxiproxy-cli"
 VERSION="2.1.4"
 NAME_AND_VERSION=$NAME""$VERSION
 NAME_AND_STUFF=$NAME_AND_VERSION".linux-amd64"
@@ -23,6 +23,6 @@ mkdir -p "${LOCAL_STUFF}/toxiproxy"
 mv "/tmp/${TARBALL_NAME}" "${LOCAL_STUFF}/toxiproxy/${TARBALL_NAME}"
 chmod 700 "${LOCAL_STUFF}/toxiproxy/${TARBALL_NAME}"
 
-rm ~/.local/bin/toxiproxy
+rm ~/.local/bin/toxiproxy-cli
 
-ln -s ${LOCAL_STUFF}/toxiproxy/${TARBALL_NAME} ~/.local/bin/toxiproxy
+ln -s ${LOCAL_STUFF}/toxiproxy/${TARBALL_NAME} ~/.local/bin/toxiproxy-cli
