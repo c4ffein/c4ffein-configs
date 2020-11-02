@@ -45,7 +45,7 @@ iex $chocolateyPSString
 
 
 Write-Host "Installing programs" -ForegroundColor Red
-choco install firefox python atom cmder git gh -y
+choco install firefox python atom cmder git gh powertoys -y
 
 
 Write-Host "Installing Python utility packages" -ForegroundColor Red
