@@ -27,3 +27,9 @@ install-font \
   "http://fonts.google.com/download?family=Montserrat" \
   "Montserrat.zip" \
   "590e5db0ff06496d7264fc44a6d11fbd2e0e8af396669cf37248f22e2a781203"
+
+# Nerd Fonts include special terminal icons, Nerd Font version of the Hack font
+install-font \
+  "https://github.com/ryanoasis/nerd-fonts/releases/download/v2.1.0/Hack.zip" \
+  "Hack.zip" \
+  "70852e59fcffbe31d401f615625bcb9ebb6af72732c2f1fe9b9d5370c2565514"
