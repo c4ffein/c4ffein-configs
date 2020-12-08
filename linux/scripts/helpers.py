@@ -60,17 +60,24 @@ def get_site_and_path(url):
     return site, path
 
 
-def get_aws_data(repo=b"", release_name_start="", release_name_end=""):
-    # Get browser url of latest release
+def get_aws_data(repo=b"", release_name_start="", release_name_end="", version=""):
+    # Get browser url of latest release, or all if needed
     data = json.loads(
         get_body(
             b"api.github.com",
-            b"/repos/" + repo + b"/releases/latest",
-            "3aae0a71392f86225ef29fa9fe0c66bd8a85abf5c68ff2d1e333a8ef6feb5287",
+            b"/repos/" + repo + b"/releases/latest" if not version else b"/repos/" + repo + b"/releases",
+            "71c21791a83adc06c5b86cd493f0c4f51bb58f712df6fe0df0f03cd5e466464e",
             user_agent=b"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36",
             type=json,
         )
     )
+    if version:
+        for data_object in data:
+            print(data_object)
+            if data_object["tag_name"] == version:
+                data = data_object
+                break
+
     for asset in data["assets"]:
         if asset["name"].startswith(release_name_start) and asset["name"].endswith(
             release_name_end
