@@ -45,7 +45,7 @@ iex $chocolateyPSString
 
 
 Write-Host "Installing programs" -ForegroundColor Red
-choco install firefox python atom cmder git gh powertoys -y
+choco install python atom cmder git gh powertoys -y
 
 
 Write-Host "Installing Python utility packages" -ForegroundColor Red
@@ -57,6 +57,9 @@ Write-Host "Adding missing shortcuts" -ForegroundColor Red
 Import-Module "$env:ChocolateyInstall\helpers\chocolateyInstaller.psm1"
 Install-ChocolateyShortcut -ShortcutFilePath ([Environment]::GetFolderPath("Desktop")+"\Cmder.lnk") -TargetPath $Env:SYSTEMDRIVE"\tools\Cmder\Cmder.exe"
 Install-ChocolateyShortcut -ShortcutFilePath ([Environment]::GetFolderPath("Desktop")+"\Atom.lnk") -TargetPath $(Convert-Path ($env:LOCALAPPDATA + "\atom\app*\atom.exe"))
+
+
+echo "[alias]`n  co = checkout`n  ct = commit`n  st = status`n  br = branch`n  type = cat-file -t`n  dump = cat-file -p" > ~/.gitconfig
 
 
 pause
