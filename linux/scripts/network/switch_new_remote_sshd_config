@@ -1,0 +1,6 @@
+#!/bin/bash
+
+for var in "$@"
+do
+    ssh $var "sudo mv /etc/ssh/sshd_config_new /etc/ssh/sshd_config" && echo $var moved config || echo -e "\033[0;31mERROR $var\033[0m"
+done

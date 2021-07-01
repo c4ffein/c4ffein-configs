@@ -18,10 +18,12 @@ def print_secured_config_file(file_path):
                     pass_disabled_found = True
                 else:
                     r.append(l)
+    if r[-1] != "" or r[-1][-1] != "\n":
+        r[-1] += "\n"
     if not pass_disabled_found:
         r.append("PasswordAuthentication no")
     print("".join(r))
 
 
 if __name__ == "__main__":
-    print_secured_config_file("/etc/ssh/ssh_config")
+    print_secured_config_file("/etc/ssh/sshd_config")

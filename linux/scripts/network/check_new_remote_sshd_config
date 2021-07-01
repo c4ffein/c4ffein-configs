@@ -1,0 +1,6 @@
+#!/bin/bash
+
+for var in "$@"
+do
+    ssh $var "grep -ri '^PasswordAuthentication no$' /etc/ssh/sshd_config_new" > /dev/null && echo $var seems OK || echo -e "\033[0;31mERROR $var\033[0m"
+done

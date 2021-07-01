@@ -1,0 +1,7 @@
+#!/bin/bash
+
+for var in "$@"
+do
+    ssh $var "python3 | sudo bash -c 'cat > /etc/ssh/sshd_config_new'" < print_hardened_ssh_config.py
+    echo Printed for $var
+done

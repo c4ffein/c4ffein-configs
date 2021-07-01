@@ -1,0 +1,7 @@
+#!/bin/bash
+
+for var in "$@"
+do
+    # ssh.service on Debian/Ubuntu but sshd.service on most of the other distributions
+    ssh $var "sudo systemctl restart ssh.service" && echo $var seems OK || echo -e "\033[0;31mERROR $var\033[0m"
+done
