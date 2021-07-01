@@ -25,4 +25,3 @@ def print_secured_config_file(file_path):
 
 if __name__ == "__main__":
     print_secured_config_file("/etc/ssh/ssh_config")
-
