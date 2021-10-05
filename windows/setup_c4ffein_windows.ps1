@@ -4,7 +4,7 @@
 $certifAlgorithm = 'sha256RSA'
 $certifSubject = 'CN="Chocolatey Software, Inc.", O="Chocolatey Software, Inc.", L=Topeka, S=Kansas, C=US'
 $certifIssuer = 'CN=DigiCert SHA2 Assured ID Code Signing CA, OU=www.digicert.com, O=DigiCert Inc, C=US'
-$certifThumbprint = "4BF7DCBC06F6D0BDFA8A0A78DE0EFB62563C4D87"
+$certifThumbprint = "83AC7D88C66CB8680BCE802E0F0F5C179722764B"
 
 
 # Start another PowerShell process as Admin if needed
