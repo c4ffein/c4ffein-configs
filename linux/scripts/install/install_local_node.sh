@@ -2,13 +2,13 @@
 
 
 NAME="node"
-VERSION="v12.18.3"
+VERSION="v16.14.2"
 NAME_AND_VERSION=$NAME"-"$VERSION
 NAME_AND_STUFF=$NAME_AND_VERSION"-linux-x64"
 TARBALL_LINK="https://nodejs.org/dist/"$VERSION"/"$NAME_AND_STUFF".tar.xz"
 TARBALL_NAME=$NAME_AND_STUFF".tar.xz"
 LOCAL_STUFF="$HOME/.local/external"
-CHECK_HASH="b79e02e48d0a1ee4cd4ae138de97fda5413542f2a4f441a7d0e189697b8da563"
+CHECK_HASH="e40c6f81bfd078976d85296b5e657be19e06862497741ad82902d0704b34bb1b"
 
 
 mkdir -p $LOCAL_STUFF
@@ -27,4 +27,4 @@ rm ~/.local/bin/npx
 
 ln -s ${LOCAL_STUFF}/$NAME_AND_STUFF/bin/node ~/.local/bin/node
 ln -s ${LOCAL_STUFF}/$NAME_AND_STUFF/bin/npm ~/.local/bin/npm
-ln -s ${LOCAL_STUPP}/$NAME_AND_STUFF/bin/npx ~/.local/bin/npx
+ln -s ${LOCAL_STUFF}/$NAME_AND_STUFF/bin/npx ~/.local/bin/npx
