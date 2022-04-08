@@ -1,4 +1,4 @@
-Quick setups for different environments
+Quick setups and config files for different environments
 
 # Linux
 Scripts to install multiple cli utilities without root
