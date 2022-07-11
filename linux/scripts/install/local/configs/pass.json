@@ -6,5 +6,5 @@
 ["lns", ".local/external/password-store/password-store-1.7.4/src/completion/pass.bash-completion", ".local/sourcemes/pass.bash-completion"],
 ["mkdirp", ".local/share/password-store"],
 ["comment", "pass installed, don't forget to export PASSWORD_STORE_DIR=$HOME/.local/share/password-store in .bashrc"],
-["comment", "instead of line 405: ls -R \"$PREFIX/$path\" | grep \":$\" | sed -e 's/:$//' -e 's/[^-][^\/]*\//--/g' -e 's/^/   /' -e 's/-/|/'"]
+["comment", "instead of line 405: ls -R \"$PREFIX/$path\" | grep \":$\" | sed -e 's/:$//' -e 's/[^-][^\\/]*\\//--/g' -e 's/^/   /' -e 's/-/|/'"]
 ]}
