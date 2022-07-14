@@ -12,47 +12,72 @@ import io
 import json
 import urllib.request
 import hashlib
-import subprocess
+from subprocess import check_output, Popen, PIPE, STDOUT
+
+
+
+def parse_string(context, lis):
+    if isinstance(lis, str):
+        return lis if lis[0] != "$" else lis[1:] if lis[1] == "$" else str(context.get(lis[1:]))
+    if isinstance(lis, list):
+        return "".join(map(lambda l: parse_string(context, l), lis))
+    raise Exception("BAD TYPE for parse_string")
+
+
+def set(context, line):
+    print(f"set: {line}")
+    context[line[1]] = parse_string(context, line[2])
 
 
 def download(context, line):
     print(f"download: {line}")
-    r = urllib.request.urlopen(line[1])
+    r = urllib.request.urlopen(parse_string(context, line[1]))
     b = r.read()
     m = hashlib.sha256()
     m.update(b)
-    if m.digest().hex() != line[2]:
+    if m.digest().hex() != parse_string(context, line[2]):
         raise Exception("BAD EXE HASH")
-    context[line[3]] = b
+    context[parse_string(context, line[3])] = b
 
 
 def one_tar_xz(context, line):
     print(f"tar.xz: {line}")
-    tar_io = io.BytesIO(context.get(line[1]))
+    tar_io = io.BytesIO(context.get(parse_string(context, line[1])))
     with tarfile.open(fileobj=tar_io) as tar:
         for member in tar:
-            if member.name == line[2]:
+            if member.name == parse_string(context, line[2]):
                 extractable_file = tar.extractfile(member)
-                drop_dir = Path.home() / line[3]
+                drop_dir = Path.home() / parse_string(context, line[3])
                 drop_dir.mkdir(parents=True, exist_ok=True)
-                final_drop_path = drop_dir / line[4]
+                final_drop_path = drop_dir / parse_string(context, line[4])
                 with open(final_drop_path, mode="wb") as final_drop:
                     content = extractable_file.read()
                     final_drop.write(content)
                 os.chmod(final_drop_path, 0o700)
 
 
+def tar_xz_exec(context, line):  # TODO : parse_string?
+    print(f"tar_xz_exec: {line}")
+    drop_path = parse_string(context, line[2])
+    full_drop = (Path.home() / drop_path)
+    full_drop.mkdir(parents=True, exist_ok=True)
+    p = Popen(["tar", "xJ", "-C", str(full_drop)], stdout=PIPE, stdin=PIPE, stderr=PIPE)
+    stdout_data = p.communicate(input=context.get(parse_string(context, line[1])))
+    if stdout_data != (b'', b''): print("FAILED_STDOUT : ", stdout_data)
+
+
 def tar_xz(context, line):  # also works for tar.gz
     print(f"tar.xz: {line}")
-    tar_io = io.BytesIO(context.get(line[1]))
+    tar_io = io.BytesIO(context.get(parse_string(context, line[1])))
+    # with tarfile.open(fileobj=tar_io, mode="r:xz") as tar:  # xz mode may not be available
     with tarfile.open(fileobj=tar_io) as tar:
-        subtar = [e for e in tar.getmembers() if e.name.startswith(len[3])] if len(line) > 3 and len[3] else None
-        tar.extractall(path=Path.home() / line[2], members=subtar)
+        subtar = [e for e in tar.getmembers() if e.name.startswith(parse_string(context, len[3]))] if len(line) > 3 and len[3] else None
+        tar.extractall(path=Path.home() / parse_string(context, line[2]), members=subtar)
 
 
 def mkdirp(context, line):
     print(f"mkdirp: {line}")
-    (Path.home() / line[1]).mkdir(parents=True, exist_ok=True)
+    (Path.home() / parse_string(context, line[1])).mkdir(parents=True, exist_ok=True)
 
 
 def mv(context, line):
@@ -62,7 +87,7 @@ def mv(context, line):
 
 def lns(context, line):
     print(f"lns: {line}")
-    os.symlink(Path.home() / line[1], Path.home() / line[2])
+    os.symlink(Path.home() / parse_string(context, line[1]), Path.home() / parse_string(context, line[2]))
 
 
 def comment(context, line):
@@ -72,23 +97,23 @@ def comment(context, line):
 
 def cd(context, line):
     print(f"cd: {line}")
-    os.chdir(Path.home() / line[1])
+    os.chdir(Path.home() / parse_string(context, line[1]))
 
 
-def hexec(context, line):
+def hexec(context, line):  # TODO : parse_string?
     print(f"hexec: {line}")
-    x = subprocess.check_output([Path.home() / line[1], *(line[2][1:] if len(line[2]) > 1 else [])])
+    x = check_output([Path.home() / line[1], *(line[2][1:] if len(line[2]) > 1 else [])])
     print(x)
 
 
-def sexec(context, line):
+def sexec(context, line):  # TODO : parse_string?
     print(f"sexec: {line}")
     # os.execve(Path.home() / line[1], line[2] if len(line) > 2 else [], {})
     # os.execv(Path.home() / line[1], line[2] if len(line) > 2 else [])  # We want to keep env actually
-    x = subprocess.check_output([line[1], *(line[2][1:] if len(line) > 2 and len(line[2]) > 1 else [])])
+    x = check_output([line[1], *(line[2][1:] if len(line) > 2 and len(line[2]) > 1 else [])])
 
 
-def replace_line(context, line):  # file, line number, new line
+def replace_line(context, line):  # file, line number, new line # TODO : parse_string?
     print(f"replace_line: {line}")
     with open(Path.home() / line[1], "r", encoding="utf-8") as file:
         data = file.readlines()
@@ -98,8 +123,10 @@ def replace_line(context, line):  # file, line number, new line
 
 
 funcs = {
+    "set": set,
     "download": download,
     "tar.xz": tar_xz,
+    "exec_tar.xz": tar_xz_exec,
     "mkdirp": mkdirp,
     "mv": mv,
     "lns": lns,
@@ -116,7 +143,7 @@ def get_configs():
     return {n[:-5]: dir / n for n in os.listdir(dir) if n[-5:] == ".json"}  # TODO : raise if no config
 
 
-def list(args):
+def flist(args):
     configs = get_configs()
     for i in configs:
         print(i)
@@ -167,10 +194,10 @@ def main(argv=None):
         parser.print_help()
         return
     try:
-        return {"install": install, "list": list, "autocomplete": autocomplete}[args.command](args)
+        return {"install": install, "list": flist, "autocomplete": autocomplete}[args.command](args)
     except Exception as e:
         print(f"Exception: {e}")
-        # return -1
+        return -1
 
 
 if __name__ == "__main__":

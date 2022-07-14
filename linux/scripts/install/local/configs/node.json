@@ -1,0 +1,19 @@
+{"install":[
+["set", "NAME", "node"],
+["set", "VERSION", "v16.14.2"],
+["set", "NAME_AND_VERSION", ["$NAME", "-", "$VERSION"]],
+["set", "NAME_AND_STUFF", ["$NAME_AND_VERSION", "-linux-x64"]],
+["set", "TARBALL_LINK", ["https://nodejs.org/dist/", "$VERSION", "/", "$NAME_AND_STUFF", ".tar.xz"]],
+["set", "TARBALL_NAME", ["$NAME_AND_STUFF", ".tar.xz"]],
+["set", "LOCAL_STUFF", [".local/external/node"]],
+["set", "CHECK_HASH", "e40c6f81bfd078976d85296b5e657be19e06862497741ad82902d0704b34bb1b"],
+["mkdirp", "$LOCAL_STUFF"],
+["download", "$TARBALL_LINK", "$CHECK_HASH", "$TARBALL_NAME"],
+["exec_tar.xz", "$TARBALL_NAME", ["$LOCAL_STUFF"]],
+["comment", "rm ~/.local/bin/node"],
+["comment", "rm ~/.local/bin/npm"],
+["comment", "rm ~/.local/bin/npx"],
+["lns", ["$LOCAL_STUFF", "/", "$NAME_AND_STUFF", "/bin/node"],  ".local/bin/node"],
+["lns", ["$LOCAL_STUFF", "/", "$NAME_AND_STUFF", "/bin/npm"],  ".local/bin/npm"],
+["lns", ["$LOCAL_STUFF", "/", "$NAME_AND_STUFF", "/bin/npx"],  ".local/bin/npx"]
+]}
