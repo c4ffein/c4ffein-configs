@@ -1,0 +1,5 @@
+{"install":[
+["download", "https://github.com/bugaevc/wl-clipboard/archive/refs/tags/v2.1.0.tar.gz", "72dab9a7d3835c76d6ff2089f15ffec9e064a321e5f3cbbe961a8fa81aff5573", "wl-clipboard-2.1.0.tar.gz"],
+["tar.gz", "wl-clipboard-2.1.0.tar.gz", ".local/external/wl-clipboard/"],
+["comment", "TODO : replace meson build system."],
+]}

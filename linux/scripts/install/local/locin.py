@@ -4,6 +4,7 @@
 # In a PoC state, as it is used only by myself
 
 import os
+import stat
 import sys
 import argparse
 from pathlib import Path
@@ -38,6 +39,14 @@ def download(context, line):
     if m.digest().hex() != parse_string(context, line[2]):
         raise Exception("BAD EXE HASH")
     context[parse_string(context, line[3])] = b
+
+
+def drop(context, line):
+    print(f"drop: {line}")
+    content = context.get(parse_string(context, line[2]))
+    path = Path.home() / parse_string(context, line[1])
+    with open(path, mode="wb") as file:
+        file.write(content)
 
 
 def one_tar_xz(context, line):
@@ -113,6 +122,13 @@ def sexec(context, line):  # TODO : parse_string?
     x = check_output([line[1], *(line[2][1:] if len(line) > 2 and len(line[2]) > 1 else [])])
 
 
+def chmodx(context, line):
+    print(f"chmodx: {line}")
+    path = Path.home() / parse_string(context, line[1])
+    st = os.stat(path)
+    os.chmod(path, st.st_mode | stat.S_IEXEC)  # OR stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH ?
+
+
 def replace_line(context, line):  # file, line number, new line # TODO : parse_string?
     print(f"replace_line: {line}")
     with open(Path.home() / line[1], "r", encoding="utf-8") as file:
@@ -125,6 +141,7 @@ def replace_line(context, line):  # file, line number, new line # TODO : parse_s
 funcs = {
     "set": set,
     "download": download,
+    "drop": drop,
     "tar.xz": tar_xz,
     "exec_tar.xz": tar_xz_exec,
     "mkdirp": mkdirp,
@@ -134,6 +151,7 @@ funcs = {
     "cd": cd,
     "hexec": hexec,
     "sexec": sexec,
+    "chmodx": chmodx,
     "replace line": replace_line,
 }
 
