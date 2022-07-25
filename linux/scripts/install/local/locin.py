@@ -21,6 +21,8 @@ def parse_string(context, lis):
     if isinstance(lis, str):
         return lis if lis[0] != "$" else lis[1:] if lis[1] == "$" else str(context.get(lis[1:]))
     if isinstance(lis, list):
+        if lis[0] == "$":
+            return lis[1:]
         return "".join(map(lambda l: parse_string(context, l), lis))
     raise Exception("BAD TYPE for parse_string")
 
@@ -138,6 +140,12 @@ def replace_line(context, line):  # file, line number, new line # TODO : parse_s
         file.writelines(data)
 
 
+def write(context, line):
+    print(f"write: {line}")
+    with open(Path.home() / line[1], "w", encoding="utf-8") as file:
+        file.writelines("\n".join(context[parse_string(context, line[2])]))
+
+
 funcs = {
     "set": set,
     "download": download,
@@ -153,6 +161,7 @@ funcs = {
     "sexec": sexec,
     "chmodx": chmodx,
     "replace line": replace_line,
+    "write": write,
 }
 
 
