@@ -1,0 +1,5 @@
+{"install":[
+["download", "https://github.com/scaleway/scaleway-cli/releases/download/v2.5.4/scaleway-cli_2.5.4_linux_amd64", "e275015b640b115a4a8403391d3d5ba3091688243d7eae267815c1abd65aa9fc", "scaleway-cli_2.5.4_linux_amd64"],
+["drop", ".local/bin/scw", "scaleway-cli_2.5.4_linux_amd64"],
+["chmodx", ".local/bin/scw"]
+]}
