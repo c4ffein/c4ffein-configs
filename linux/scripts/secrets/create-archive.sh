@@ -17,5 +17,6 @@ mkdir "$FILENAME"
 cp -r ~/.gnupg "$FILENAME"
 cp -r ~/.ssh "$FILENAME"
 cp -r ~/.local/share/password-store "$FILENAME"  # need gpg key to unlock
+cp ~/.2fa "$FILENAME"  # This is bad, but it depends on the 2fa implem
 tar -czvf "$FILENAME".tar.gz "$FILENAME"
 gpg --pinentry-mode loopback --passphrase "$PASSPHRASE" -c "$FILENAME".tar.gz
