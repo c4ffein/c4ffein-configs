@@ -27,7 +27,7 @@ async def get_sound():
 
 
 async def play_sound(wav):
-    p = await asyncio.create_subprocess_shell("aplay", stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE)
+    p = await asyncio.create_subprocess_shell("aplay -q", stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE)
     # We could try looping `p.stdin.write`, except aplay seems to quit after the declared lenght of the .wav
     # See await p.communicate(wav + wav + wav) : just overlapping pla_sound then...
     stdout, stderr = await p.communicate(wav)
