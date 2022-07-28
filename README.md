@@ -11,7 +11,7 @@ One script to setup a decent Windows environment from a clean install using Choc
 ## MacOS
 One script to setup a NativeScript / React Native dev environment for a regular user.  
 It only requires an Admin to:
-- Install XCode,
+- Install XCode
 - Setup a directory as root with the correct rights (used by watchman)
 This script was made to get a dev env as fast as possible (reusing pre-built watchman, patching it with install_name_tool for example)
 
