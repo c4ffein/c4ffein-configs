@@ -17,4 +17,4 @@ It only requires an Admin to:
 This script was made to get a dev env as fast as possible (reusing pre-built watchman, patching it with install_name_tool for example)
 
 ## Linux
-Most of my personal scripts, still not clean
+Some of my personal scripts, still not clean
