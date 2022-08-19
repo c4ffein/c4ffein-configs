@@ -33,6 +33,9 @@ echo 'export PATH="$ANDROID_SDK_ROOT"/cmdline-tools/bin:"$PATH"'                
 echo 'export ANDROID_HOME="$ANDROID_SDK_ROOT"'                                          >> "$ENVSH"  # Native Script...
 echo 'export PATH=$PATH:$ANDROID_SDK_ROOT/emulator'                                     >> "$ENVSH"
 echo 'export PATH=$PATH:$ANDROID_SDK_ROOT/platform-tools'                               >> "$ENVSH"
+echo ''                                                                                 >> "$ENVSH"
+echo 'alias gr=grep'                                                                    >> "$ENVSH"
+echo 'alias la="ls-lah"'                                                                >> "$ENVSH"
 
 echo '. "$HOME"/'"$ENVSH_NH"                                                            >> ~/.zshrc
 . "$HOME"/.zshrc
