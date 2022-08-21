@@ -1,0 +1,5 @@
+{"install":[
+["download", "https://github.com/charmbracelet/gum/releases/download/v0.4.0/gum_0.4.0_linux_x86_64.tar.gz", "a4dcb4b297d7766a6c0039c64d8ea968356f693b99b1903bb988858d326af64b", "gum_0.4.0_linux_x86_64.tar.gz"],
+["tar.xz", "gum_0.4.0_linux_x86_64.tar.gz", ".local/external/gum"],
+["lns", ".local/external/gum/gum", ".local/bin/gum"]
+]}
