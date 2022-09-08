@@ -5,9 +5,16 @@
 # TODO : https://reactnative.dev/docs/environment-setup - iOS guide      : TODO #
 
 echo "This will setup a dev﹡env for a fresh regular MacOS user."
-echo "                         ﹡(NativeScript / React Native)"
+echo "                           ﹡(NativeScript / React Native)"
 echo "Only prerequisites are"
 echo "  - XCode and other build tools have been installed"
+echo "    - \`xcode-select --install/\` for a CommandLineTools only install"
+echo "    - Warning : you may have to install the whole Xcode and not just"
+echo "      the Command Line Tools for some deps, e.g. Capacitor"
+echo "    - Select an Xcode dev tools path using xcode-select"
+echo "      - Use the Xcode one if possible, otherwise will be as if it is not there"
+echo "      - \`xcode-select -s /Applications/Xcode.app/Contents/Developer\` or else"
+echo "      - \`sudo xcode-select -switch /Library/Developer/CommandLineTools\`"
 echo "  - You"
 echo "    - created a /usr/local/var/run/watchman directory"
 echo "    - chmod 2777 it so that any user can create its state directory inside"
@@ -18,6 +25,24 @@ read -p "Press enter to continue, ctrl-C to quit"
 ENVSH_NH=.local/env.sh
 ENVSH="$HOME"/"$ENVSH_NH"
 TEMURIN_PATH_NH=.local/external/adoptium/temurin
+export GODIR=".local/external/go"
+
+
+# Friendly reminder mamene
+# % touch a\ b c
+# % k=a\ b; echo $k
+# a b
+# % k=a\ b; ls $k 
+# a b
+# % k=a\ b; ls ${k}
+# a b
+# % bash
+# bash-3.2$ k=a\ b; ls ${k}
+# ls: a: No such file or directory
+# ls: b: No such file or directory
+# bash-3.2$ k=a\ b; ls "${k}"
+# a b
+
 
 set -e
 cd ~
@@ -33,6 +58,11 @@ echo 'export PATH="$ANDROID_SDK_ROOT"/cmdline-tools/bin:"$PATH"'                
 echo 'export ANDROID_HOME="$ANDROID_SDK_ROOT"'                                          >> "$ENVSH"  # Native Script...
 echo 'export PATH=$PATH:$ANDROID_SDK_ROOT/emulator'                                     >> "$ENVSH"
 echo 'export PATH=$PATH:$ANDROID_SDK_ROOT/platform-tools'                               >> "$ENVSH"
+echo "export GOROOT="'"$HOME"'/"$GODIR"/goroot                                          >> "$ENVSH"
+echo "export GOPATH="'"$HOME"'/"$GODIR"/gopath                                          >> "$ENVSH"
+echo "export PATH="'${PATH}:${GOROOT}/bin:$GOPATH/bin'                                  >> "$ENVSH"
+echo "export GEM_HOME="'"$HOME"'/.local/external/rubygems/gems                          >> "$ENVSH"
+echo "export PATH="'${PATH}:"$HOME"/.local/external/rubygems/gems/bin'                  >> "$ENVSH"
 echo ''                                                                                 >> "$ENVSH"
 echo 'alias gr=grep'                                                                    >> "$ENVSH"
 echo 'alias la="ls-lah"'                                                                >> "$ENVSH"
@@ -64,6 +94,17 @@ done
 set -e
 ln -s "$(pwd)"/bin/watchman ~/.local/bin/watchman
 cd -
+
+# Cocoapods
+mkdir -p "$GEM_HOME"
+gem install cocoapods
+
+# Go
+mkdir -p "$GOPATH"
+rm -rf "$GOROOT"
+curl -s https://dl.google.com/go/go1.19.darwin-amd64.tar.gz | tar zxf - -C "$HOME"/"$GODIR"
+mv "$HOME"/"$GODIR"/go "$HOME"/"$GODIR"/goroot
+
 
 # TODO : Secure
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
