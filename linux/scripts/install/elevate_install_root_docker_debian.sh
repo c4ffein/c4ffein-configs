@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# WARNING : Official method for Debian 9/10 on 08/04/2021. Doesn't work for Raspbian
+# WARNING : Official method for Debian 10/11 on 18/09/2022. Doesn't work for Raspbian
+# Now installs docker-compose as a docker plugin
 
 
 sudo su
@@ -8,7 +9,6 @@ sudo su
 apt-get update
 
 apt-get install \
-    apt-transport-https \
     ca-certificates \
     curl \
     gnupg \
@@ -22,6 +22,5 @@ echo \
 
 apt-get update
 
-apt-get install docker-ce docker-ce-cli containerd.io
+apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
-apt-get install docker-compose
