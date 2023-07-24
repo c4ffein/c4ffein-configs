@@ -6,3 +6,4 @@
   hist = log --pretty=format:\"%h %ad | %s%d [%an]\" --graph --date=short
   type = cat-file -t
   dump = cat-file -p
+  lol = log --date=iso --oneline --graph --all --decorate --pretty=tformat:'%Cred%h%Creset(%G?) -%C(yellow)%d%Creset %s %Cblue%ae %Cgreen%ad%Creset'
