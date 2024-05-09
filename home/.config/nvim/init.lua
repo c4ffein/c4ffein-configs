@@ -1,3 +1,4 @@
+vim.cmd([[
 noremap j h
 noremap i k
 noremap k j
@@ -39,3 +40,6 @@ filetype plugin indent on
 syntax on
 set clipboard=unnamedplus
 set ttyfast
+]])
+
+vim.g.editorconfig = false
