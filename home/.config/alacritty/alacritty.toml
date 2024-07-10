@@ -2,6 +2,12 @@
 TERM = "alacritty"
 
 
+[[hints.enabled]]  # see https://github.com/alacritty/alacritty/issues/5246
+command = ""
+hyperlinks = true
+mouse.enabled = false
+
+
 [window]          # Fixes MacOS Mission Control being laggy,
 opacity = 0.9999  # see https://github.com/alacritty/alacritty/issues/4474
 
