@@ -18,6 +18,7 @@ y = 0
 
 [font]
 size = 9.4
+# size = 8.0  # x150 on Windows
 
 [font.normal]
 family = "Hack Nerd Font"
