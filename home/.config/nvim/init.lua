@@ -15,6 +15,19 @@ noremap : ;
 
 inoremap hh <esc>
 
+" ctrl-ijkl to move during edit
+inoremap <C-i> <up>  " this works with Alacritty but won't on most legacy terminals
+inoremap <C-j> <left>
+inoremap <C-k> <down>
+inoremap <C-l> <right>
+" ctrl-ijkl actually also works in other modes
+noremap <C-i> <up>  " this works with Alacritty but won't on most legacy terminals
+noremap <C-j> <left>
+noremap <C-k> <down>
+noremap <C-l> <right>
+
+vnoremap h I
+
 set number relativenumber
 
 syntax enable
