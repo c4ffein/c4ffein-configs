@@ -15,13 +15,13 @@ noremap : ;
 
 inoremap hh <esc>
 
-" ctrl-ijkl to move during edit
-inoremap <C-i> <up>  " this works with Alacritty but won't on most legacy terminals
+" ctrl-ijkl to move during edit: <C-i> works with Alacritty but won't on most legacy terminals
+inoremap <C-i> <up>
 inoremap <C-j> <left>
 inoremap <C-k> <down>
 inoremap <C-l> <right>
-" ctrl-ijkl actually also works in other modes
-noremap <C-i> <up>  " this works with Alacritty but won't on most legacy terminals
+" ctrl-ijkl actually also works in other modes:  this works with Alacritty but won't on most legacy terminals
+noremap <C-i> <up>
 noremap <C-j> <left>
 noremap <C-k> <down>
 noremap <C-l> <right>
