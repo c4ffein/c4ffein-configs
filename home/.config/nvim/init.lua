@@ -26,7 +26,7 @@ noremap <C-j> <left>
 noremap <C-k> <down>
 noremap <C-l> <right>
 
-vnoremap h I
+vnoremap H I
 
 set number relativenumber
 
