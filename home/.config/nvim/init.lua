@@ -13,7 +13,8 @@ noremap P p
 noremap ; :
 noremap : ;
 
-inoremap hh <esc>
+inoremap hh    <esc>
+inoremap <C-h> <esc>
 
 " ctrl-ijkl to move during edit: <C-i> works with Alacritty but won't on most legacy terminals
 inoremap <C-i> <up>
