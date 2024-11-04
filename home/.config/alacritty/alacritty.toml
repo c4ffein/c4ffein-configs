@@ -51,6 +51,11 @@ magenta = "#ff77cc"
 cyan    = "#88eeff"
 white   = "#ffffff"
 
+[[keyboard.bindings]]
+key = "i"
+mods = "Control"
+chars = "\u001d"  # 0x1d = 29 = <C-]> = Group Separator
+
 [colors.bright]
 black   = "#555555"
 red     = "#ff5555"
