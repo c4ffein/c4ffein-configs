@@ -8,6 +8,12 @@ hyperlinks = true
 mouse.enabled = false
 
 
+[[keyboard.bindings]]
+key = "i"
+mods = "Control"
+chars = "\u001e"  # 0x1e = 30 = <C-^> = Record Separator
+
+
 [window]          # Fixes MacOS Mission Control being laggy,
 opacity = 0.9999  # see https://github.com/alacritty/alacritty/issues/4474
 
@@ -50,11 +56,6 @@ blue    = "#88eeff"
 magenta = "#ff77cc"
 cyan    = "#88eeff"
 white   = "#ffffff"
-
-[[keyboard.bindings]]
-key = "i"
-mods = "Control"
-chars = "\u001d"  # 0x1d = 29 = <C-]> = Group Separator
 
 [colors.bright]
 black   = "#555555"
