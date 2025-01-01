@@ -55,6 +55,9 @@ filetype plugin indent on
 syntax on
 set clipboard=unnamedplus
 set ttyfast
+
+" TODO : Check security
+" au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
 ]])
 
 vim.g.editorconfig = false
