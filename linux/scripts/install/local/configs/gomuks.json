@@ -1,5 +1,0 @@
-{"install":[
-["download", "https://github.com/tulir/gomuks/releases/download/v0.2.4/gomuks-linux-amd64", "1a5d92b6aea0d34afec8cc83f016334e944c15f311064e209a386c46fb2c60a0", "gomuks-linux-amd64"],
-["drop", ".local/bin/gomuks", "gomuks-linux-amd64"],
-["chmodx", ".local/bin/gomuks"]
-]}
