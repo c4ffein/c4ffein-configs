@@ -60,4 +60,6 @@ set ttyfast
 " au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
 ]])
 
+vim.cmd('colorscheme c4ffein')
+
 vim.g.editorconfig = false
