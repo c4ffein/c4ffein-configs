@@ -63,3 +63,5 @@ set ttyfast
 vim.cmd('colorscheme c4ffein')
 
 vim.g.editorconfig = false
+
+require('file-finder').setup()
