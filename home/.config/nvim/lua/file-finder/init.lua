@@ -1,5 +1,7 @@
 local M = {}
 
+local home_path = os.getenv("HOME") or os.getenv("USERPROFILE") -- Unix or Windows
+
 local popup_win_id = nil
 local popup_buf_id = nil
 
@@ -9,21 +11,21 @@ function M.show_popup()
     local old_files = vim.v.oldfiles
     local old_files_lines = {}
     for i, v in ipairs(old_files) do
+        if string.sub(v, 1, #home_path) == home_path then
+            v = '~' .. string.sub(v, #home_path+1, -1)
+        end
         old_files_lines[i] = string.format(' %2d ', i-1) .. v
     end
 
     vim.api.nvim_buf_set_lines(popup_buf_id, 0, -1, false, old_files_lines)
     local ns_id = vim.api.nvim_create_namespace('buf-color-namespace')
-    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightRed', 0, 0, -1)
-    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightGreen', 1, 0, -1)
-    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightBlue', 2, 0, -1)
-    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightRed', 3, 0, -1)
-    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightGreen', 4, 0, -1)
-    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightBlue', 5, 0, -1)
-    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightRed', 6, 0, -1)
-    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightGreen', 7, 0, -1)
-    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightBlue', 8, 0, -1)
-    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightRed', 9, 0, -1)
+    for i = 0, 9 do
+        local color = (i % 3 == 0) and 'BrightRed' or ((i % 3 == 1) and 'BrightGreen' or 'BrightBlue')
+        vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, color, i, 0, 3)
+        local reversed_slash_index = old_files_lines[i + 1]:reverse():find("/")
+        local last_slash_index = reversed_slash_index and (#old_files_lines[i + 1] - reversed_slash_index + 1) or 1000
+        vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, color, i, last_slash_index, -1)
+    end
 
     local editor_width = vim.api.nvim_get_option('columns')
     local editor_height = vim.api.nvim_get_option('lines')
