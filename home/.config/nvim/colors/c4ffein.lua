@@ -8,6 +8,7 @@ vim.opt.termguicolors = true
 -- Define colors
 local colors = {
   fg              = "#F8F8F2",
+  bg              = "#111111",
   selection       = "#44475A",
   comment         = "#777777",
   red             = "#FF5555",
@@ -50,6 +51,7 @@ local highlights = {
   -- Editor highlights
   Normal            = { fg = colors.fg, bg = colors.bg                 },
   NormalFloat       = { fg = colors.fg, bg = colors.bg                 },
+  FloatBorder       = { fg = colors.white                              },
   ColorColumn       = { bg = colors.selection                          },
   Cursor            = { reverse = true                                 },
   CursorLine        = { bg = colors.selection                          },
@@ -66,7 +68,6 @@ local highlights = {
   Boolean           = { fg = colors.cyan                               },
   Constant          = { fg = colors.yellow                             },
   Character         = { fg = colors.yellow                             },
-  FloatBorder       = { fg = colors.white                              },
   Function          = { fg = colors.cyan                               },
   Label             = { fg = colors.cyan                               },
   Exception         = { fg = colors.purple                             },
