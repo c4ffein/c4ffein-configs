@@ -1,5 +1,9 @@
 # Quick setups and config files for different environments
 
+## Home
+My portable .dotfiles, should be compatible with both Linux and MacOS, and even Windows for some
+
+
 ## Windows
 One script to setup a decent Windows environment from a clean install using Chocolatey
  - Checks Chocolatey installer certificate, must be sha256, thumbprint must be ok
@@ -15,6 +19,7 @@ It only requires an Admin to:
 - Setup a directory as root with the correct rights (used by watchman)
 
 This script was made to get a dev env as fast as possible (reusing pre-built watchman, patching it with install_name_tool for example)
+
 
 ## Linux
 Some of my personal scripts, still not clean
