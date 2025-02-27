@@ -13,6 +13,17 @@ function M.show_popup()
     end
 
     vim.api.nvim_buf_set_lines(popup_buf_id, 0, -1, false, old_files_lines)
+    local ns_id = vim.api.nvim_create_namespace('buf-color-namespace')
+    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightRed', 0, 0, -1)
+    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightGreen', 1, 0, -1)
+    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightBlue', 2, 0, -1)
+    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightRed', 3, 0, -1)
+    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightGreen', 4, 0, -1)
+    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightBlue', 5, 0, -1)
+    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightRed', 6, 0, -1)
+    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightGreen', 7, 0, -1)
+    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightBlue', 8, 0, -1)
+    vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, 'BrightRed', 9, 0, -1)
 
     local editor_width = vim.api.nvim_get_option('columns')
     local editor_height = vim.api.nvim_get_option('lines')
@@ -50,9 +61,6 @@ end
 
 function M.key_pressed(key)
     M.close_popup()
-    if key == 0 then  -- TODO should check if same buffer instead
-        return
-    end
     local old_files = vim.v.oldfiles
     local file_path = old_files[tonumber(key) + 1]
     vim.cmd('edit ' .. vim.fn.fnameescape(file_path))
