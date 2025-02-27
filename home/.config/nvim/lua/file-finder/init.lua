@@ -21,7 +21,7 @@ function M.show_popup()
     local ns_id = vim.api.nvim_create_namespace('buf-color-namespace')
     for i = 0, 40 do
         local color = (i % 3 == 0) and 'Statement' or ((i % 3 == 1) and 'String' or 'Title')
-        color = (i < 10) and color or 'Grey'
+        color = (i < 10) and color or 'Comment'
         local reversed_slash_index = old_files_lines[i + 1]:reverse():find("/")
         local last_slash_index = reversed_slash_index and (#old_files_lines[i + 1] - reversed_slash_index + 1) or 1000
         vim.api.nvim_buf_add_highlight(popup_buf_id, ns_id, color, i, 0, last_slash_index)

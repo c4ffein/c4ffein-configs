@@ -140,11 +140,6 @@ local highlights = {
   WarningMsg        = { fg = colors.yellow                             },
   WildMenu          = { fg = colors.black, bg = colors.white           },
 
-  -- Specific colors
-  BrightRed         = { fg = colors.bright_red                         },
-  BrightGreen       = { fg = colors.bright_green                       },
-  BrightBlue        = { fg = colors.bright_blue                        },
-
 }
 
 
