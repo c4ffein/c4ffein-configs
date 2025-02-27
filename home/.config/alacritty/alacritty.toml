@@ -44,7 +44,7 @@ style = "Bold Italic"
 
 
 [colors.primary]
-background = "#181818"
+background = "#111111"
 foreground = "#d8d8d8"
 
 [colors.normal]
