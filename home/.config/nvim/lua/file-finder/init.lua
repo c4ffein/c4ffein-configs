@@ -38,8 +38,7 @@ function write_opened_files_in_table(lines)
     return true
 end
 
-function mark_open(tableOfInfos)
-    current_file_path = tableOfInfos.match
+function mark_open_from_name(current_file_path)
     lines = get_opened_files_in_table()
     index = find_index(lines, current_file_path)
     local new_lines = {current_file_path}
@@ -48,6 +47,11 @@ function mark_open(tableOfInfos)
         if i ~= index then table.insert(new_lines, line) end
     end
     return write_opened_files_in_table(new_lines)
+end
+
+function mark_open_from_table_of_infos(table_of_infos)
+    current_file_path = table_of_infos.match
+    return mark_open_from_name(current_file_path)
 end
 
 function M.show_popup()
@@ -108,8 +112,9 @@ end
 
 function M.key_pressed(key)
     M.close_popup()
-    local old_files = vim.v.oldfiles
+    local old_files = get_opened_files_in_table()
     local file_path = old_files[tonumber(key) + 1]
+    mark_open_from_name(file_path)
     vim.cmd('edit ' .. vim.fn.fnameescape(file_path))
 end
 
@@ -130,7 +135,7 @@ function M.setup()
     vim.api.nvim_set_keymap(
         'n', 'o', ':lua require("' .. PLUGIN_NAME .. '").show_popup()<CR>',  {noremap = true, silent = true}
     )
-    vim.api.nvim_create_autocmd("BufRead", {pattern = "*", callback = mark_open})
+    vim.api.nvim_create_autocmd("BufEnter", {pattern = "*", callback = mark_open_from_table_of_infos})
 end
 
 return M
