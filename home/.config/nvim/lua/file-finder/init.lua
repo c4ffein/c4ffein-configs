@@ -24,13 +24,13 @@ local function ensure_file(path)
     if file then file:close() end
 end
 
-function get_opened_files_in_table()
+local function get_opened_files_in_table()
     local lines = {}
     for line in io.lines(data_path .. PLUGIN_LAST_FILES_OPEN_FILE_NAME) do table.insert(lines, line) end
     return lines
 end
 
-function write_opened_files_in_table(lines)
+local function write_opened_files_in_table(lines)
     local output_file = io.open(data_path .. PLUGIN_LAST_FILES_OPEN_FILE_NAME, "w")
     if not output_file then return false end
     output_file:write(table.concat(lines, '\n'))
@@ -38,7 +38,7 @@ function write_opened_files_in_table(lines)
     return true
 end
 
-function mark_open_from_name(current_file_path)
+local function mark_open_from_name(current_file_path)
     lines = get_opened_files_in_table()
     index = find_index(lines, current_file_path)
     local new_lines = {current_file_path}
@@ -49,7 +49,7 @@ function mark_open_from_name(current_file_path)
     return write_opened_files_in_table(new_lines)
 end
 
-function mark_open_from_table_of_infos(table_of_infos)
+local function mark_open_from_table_of_infos(table_of_infos)
     current_file_path = table_of_infos.match
     return mark_open_from_name(current_file_path)
 end
@@ -98,8 +98,8 @@ function M.show_popup()
 
     vim.api.nvim_win_set_option(popup_win_id, 'winblend', 15)
 
-    vim.api.nvim_buf_set_keymap(popup_buf_id, 'n', '<Esc>', 
-        ':lua require(PLUGIN_NAME).close_popup()<CR>', 
+    vim.api.nvim_buf_set_keymap(popup_buf_id, 'n', '<Esc>',
+        ':lua require(PLUGIN_NAME).close_popup()<CR>',
         {noremap = true, silent = true})
 
     for i = 0, 9 do
