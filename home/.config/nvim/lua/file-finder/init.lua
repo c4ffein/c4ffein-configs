@@ -1,3 +1,10 @@
+-- TODO save the previous status per current dir, also save a timestamp for each last opening per dir
+-- TODO when executing the algo, merge with saved openings of subdir, smart algo to merge depending on time
+-- TODO   - can ignore subdir from the list of checks when it is too old, changes date on each pick
+-- TODO when all exhausted, also search for all files in the current dir, ignoring special dirs, like the O version?
+-- TODO   - by default: node_module(s?), .venv ... => Should be common with O?
+-- TODO should merge the o and O version
+
 local M = {}
 
 local PLUGIN_NAME = 'file-finder'

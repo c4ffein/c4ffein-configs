@@ -60,8 +60,11 @@ set ttyfast
 " au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
 ]])
 
+-- TODO V is not visual line but visual on the word?
+
 vim.cmd('colorscheme c4ffein')
 
 vim.g.editorconfig = false
 
 require('file-finder').setup()
+require('file-finder-from-content').setup()
