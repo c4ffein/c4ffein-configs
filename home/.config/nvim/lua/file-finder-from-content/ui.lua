@@ -18,8 +18,7 @@ function M.create_floating_window(opts)
   
   local buf = api.nvim_create_buf(false, true)
   local win_opts = {
-    relative = "editor", width = width, height = height, row = row, col = col,
-    style = "minimal", border = "rounded", title = opts.title or "Searching", title_pos = "center",
+    relative = "editor", width = width, height = height, row = row, col = col, style = "minimal", border = "rounded"
   }
   local win = api.nvim_open_win(buf, true, win_opts)
   api.nvim_win_set_option(win, "wrap", false)
