@@ -12,7 +12,8 @@ local function get_files()  -- TODO check security
     for _, ignored in ipairs(ignored_dirs) do if dirname == ignored then return true end end
     return false
   end
-  
+  local function is_symlink(path) local stat = vim.loop.fs_lstat(path); return stat and stat.type == 'link' end
+
   local function scan_dir(path, relative_path)
     if #files >= max_files then vim.notify("Too many files in tree", vim.log.levels.WARN); return end  -- TODO custom
     
@@ -23,14 +24,14 @@ local function get_files()  -- TODO check security
       local item_path = path .. "/" .. item
 
       if vim.fn.isdirectory(item_path) == 1 then
-        if not is_ignored_dir(item) then
+        if not is_ignored_dir(item) and not is_symlink(item) then
           local new_relative = relative_path == "" and item or relative_path .. "/" .. item
           scan_dir(item_path, new_relative)
         end
-      else
+      else  -- TODO here, could be a symlink, what if the target is malformed on purpose
         local file_path = relative_path == "" and item or relative_path .. "/" .. item
         table.insert(files, file_path)
-        if #files >= max_files then break end
+        if #files >= max_files then vim.notify("Too many files in tree", vim.log.levels.WARN); break end  -- TODO custom
       end
     end
   end
