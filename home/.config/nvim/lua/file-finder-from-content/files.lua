@@ -5,44 +5,34 @@ local ui = require("file-finder-from-content.ui")
 
 local function get_files()  -- TODO check security
   local files = {}
-  local ignored_dirs = { ".git", "node_modules", ".nvim" }
+  local ignored_dirs = { ".git", "node_modules", ".nvim", ".venv" }
   local max_files = 10000
   
   local function is_ignored_dir(dirname)
-    for _, ignored in ipairs(ignored_dirs) do
-      if dirname == ignored then
-        return true
-      end
-    end
+    for _, ignored in ipairs(ignored_dirs) do if dirname == ignored then return true end end
     return false
   end
   
   local function scan_dir(path, relative_path)
-    if #files >= max_files then return end  -- TODO warning here
+    if #files >= max_files then vim.notify("Too many files in tree", vim.log.levels.WARN); return end  -- TODO custom
     
-    local handle = io.popen("ls -la " .. vim.fn.shellescape(path) .. " 2>/dev/null")  -- TODO symlinks etc? diy
-    if not handle then return end
+    local items = vim.fn.readdir(path)
+    if not items then return end
     
-    for line in handle:lines() do
-      if line:match("^d") then
-        local dirname = line:match("%s([^%s]+)$")
-        if dirname and dirname ~= "." and dirname ~= ".." and not is_ignored_dir(dirname) then
-          local new_path = path .. "/" .. dirname
-          local new_relative = relative_path == "" and dirname or relative_path .. "/" .. dirname
-          scan_dir(new_path, new_relative)
+    for _, item in ipairs(items) do
+      local item_path = path .. "/" .. item
+
+      if vim.fn.isdirectory(item_path) == 1 then
+        if not is_ignored_dir(item) then
+          local new_relative = relative_path == "" and item or relative_path .. "/" .. item
+          scan_dir(item_path, new_relative)
         end
-      elseif line:match("^-") then
-        local filename = line:match("%s([^%s]+)$")
-        if filename then
-          local file_path = relative_path == "" and filename or relative_path .. "/" .. filename
-          table.insert(files, file_path)
-          if #files >= max_files then
-            break
-          end
-        end
+      else
+        local file_path = relative_path == "" and item or relative_path .. "/" .. item
+        table.insert(files, file_path)
+        if #files >= max_files then break end
       end
     end
-    handle:close()
   end
   
   scan_dir(".", "")
@@ -51,7 +41,7 @@ end
 
 function M.find_files()
   local files = get_files()
-  if #files == 0 then vim.notify("No files found", vim.log.levels.WARN) return end
+  if #files == 0 then vim.notify("No files found", vim.log.levels.WARN) return end  -- TODO custom
   
   ui.setup_highlights()
   
