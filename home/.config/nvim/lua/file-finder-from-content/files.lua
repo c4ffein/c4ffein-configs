@@ -1,13 +1,13 @@
 local M = {}
 
-local fuzzy = require("file-finder-from-content.fuzzy")
+local scoring = require("file-finder-from-content.scoring")
 local ui = require("file-finder-from-content.ui")
 
 local function get_files()  -- TODO check security
   local files = {}
   local ignored_dirs = { ".git", "node_modules", ".nvim", ".venv" }
   local max_files = 10000
-  
+
   local function is_ignored_dir(dirname)
     for _, ignored in ipairs(ignored_dirs) do if dirname == ignored then return true end end
     return false
@@ -48,11 +48,11 @@ function M.find_files()
   
   ui.buf, ui.win = ui.create_floating_window({ title = "Find Files" })
   ui.prompt_buf, ui.prompt_win = ui.create_prompt_window(ui.win)
-  
+
   local filtered_files = files
   local selected_line = 0
   local pattern = ""
-  
+
   local function update_display()
     local display_items = {}
     for i = 1, math.min(#filtered_files, 50) do
@@ -67,7 +67,7 @@ function M.find_files()
     
     if new_pattern ~= pattern then
       pattern = new_pattern
-      filtered_files = fuzzy.filter(pattern, files)
+      filtered_files = scoring.filter(pattern, files)
       selected_line = 0
       update_display()
     end

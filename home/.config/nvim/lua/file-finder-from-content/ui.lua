@@ -52,7 +52,7 @@ function M.setup_highlights()
 end
 
 function M.highlight_line(buf, line_num, pattern, text)
-  local fuzzy = require("file-finder-from-content.fuzzy")
+  local scoring = require("file-finder-from-content.scoring")
   local matches = {}  -- TODO get it from args actually
   api.nvim_buf_clear_namespace(buf, -1, line_num, line_num + 1)
   for _, col in ipairs(matches) do api.nvim_buf_add_highlight(buf, -1, "FuzzyFinderMatch", line_num, col, col + 1) end
