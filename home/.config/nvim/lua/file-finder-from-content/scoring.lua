@@ -1,6 +1,7 @@
 local M = {}
 
 function M.score(pattern, str, skip_regex_matching)  -- TODO also return pos
+  -- lua pattern matching should be performant enough, comes from user input anyway
   local plain_pos = str:find(pattern, 1, true)  -- start at first char and plain text matching
   if plain_pos                   then return 3 end
   if skip_regex_matching         then return 0 end
@@ -12,6 +13,7 @@ end
 function M.filter(pattern, items, key_func)
   -- TODO handle this before, reuse history like with the o version?
   if not pattern or pattern == "" then return items end
+  -- TODO next line should be shown somewhere in the interface actually? Check before?
   local do_regex_matching = pcall(string.find, "", pattern)  -- check the status of the protected call
   local scored_items = {}
   key_func = key_func or function(item) return item end
