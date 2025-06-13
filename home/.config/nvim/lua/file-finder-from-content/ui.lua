@@ -1,5 +1,7 @@
 local M = {}
 
+-- TODO ctrl-o to switch with regular mode (merge it), ijkl to move with next versions
+
 local api = vim.api
 local fn = vim.fn
 
