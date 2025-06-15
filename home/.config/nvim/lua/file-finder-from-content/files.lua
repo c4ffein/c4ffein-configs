@@ -52,13 +52,27 @@ function M.find_files()
   local filtered_files = files
   local selected_line = 0
   local pattern = ""
+  local file_line_map = {}
 
   local function update_display()
     local display_items = {}
+    file_line_map = {}
     for i = 1, math.min(#filtered_files, 50) do
-      table.insert(display_items, filtered_files[i])
+      local item = filtered_files[i]
+      if type(item) == "table" then
+        file_line_map[#display_items] = i
+        table.insert(display_items, item.file)
+        if item.matched_lines and #item.matched_lines > 0 then
+          for j, match in ipairs(item.matched_lines) do
+            table.insert(display_items, "  " .. match.line_num .. ": " .. match.content)
+          end
+        end
+      else
+        file_line_map[#display_items] = i
+        table.insert(display_items, item)
+      end
     end
-    ui.update_results(ui.buf, display_items, pattern, selected_line)
+    ui.update_results(ui.buf, display_items, pattern, selected_line, file_line_map)
   end
   
   local function on_input_change()
@@ -74,16 +88,24 @@ function M.find_files()
   end
   
   local function select_file()
-    if #filtered_files > 0 and selected_line < #filtered_files then
-      local file = filtered_files[selected_line + 1]
+    local file_index = file_line_map[selected_line]
+    if file_index and file_index <= #filtered_files then
+      local item = filtered_files[file_index]
+      local file = type(item) == "table" and item.file or item
       ui.close()
       vim.cmd("edit " .. vim.fn.fnameescape(file))
     end
   end
   
   local function move_selection(direction)
-    local max_line = math.min(#filtered_files - 1, 49)
-    selected_line = math.max(0, math.min(max_line, selected_line + direction))
+    local display_line_count = 0
+    for _, _ in pairs(file_line_map) do display_line_count = display_line_count + 1 end
+    local max_line = math.min(display_line_count - 1, 49)
+
+    repeat
+      selected_line = math.max(0, math.min(max_line, selected_line + direction))
+    until file_line_map[selected_line] or selected_line == 0 or selected_line == max_line
+
     update_display()
     vim.api.nvim_win_set_cursor(ui.win, {selected_line + 1, 0})
   end

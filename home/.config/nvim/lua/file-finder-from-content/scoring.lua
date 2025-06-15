@@ -23,17 +23,18 @@ function M.filter(pattern, items, key_func)
     local key, item_score, current_score = key_func(item), 0, 0
     skip_regex_matching, current_score = M.score(pattern, item, skip_regex_matching)
     item_score = current_score * 1000
-    local matched_lines_table = {}
+    local matched_lines = {}
+    local line_num = 0
     for line in io.lines(item) do
+      line_num = line_num + 1
       skip_regex_matching, current_score = M.score(pattern, line, skip_regex_matching)
       item_score = item_score + current_score
-      -- TODO
-      -- if line_score > 0 then
-      --   table.insert(matched_lines_table, {item = item, score = score, key = key})
-      -- end
+      if current_score > 0 and #matched_lines < 3 then
+        table.insert(matched_lines, {line_num = line_num, content = line})
+      end
     end
     if item_score > 0 then
-      table.insert(scored_items, {item = item, score = item_score, key = key})
+      table.insert(scored_items, {item = item, score = item_score, key = key, matched_lines = matched_lines})
     end
   end
   
@@ -43,7 +44,7 @@ function M.filter(pattern, items, key_func)
   
   local result = {}
   for _, scored_item in ipairs(scored_items) do
-    table.insert(result, scored_item.item)
+    table.insert(result, {file = scored_item.item, matched_lines = scored_item.matched_lines})
   end
   
   return result

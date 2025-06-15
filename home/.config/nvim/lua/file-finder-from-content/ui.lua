@@ -82,7 +82,7 @@ function M.highlight_line(buf, line_num, pattern, text)
   for _, col in ipairs(matches) do api.nvim_buf_add_highlight(buf, -1, "FuzzyFinderMatch", line_num, col, col + 1) end
 end
 
-function M.update_results(buf, items, pattern, selected_line)
+function M.update_results(buf, items, pattern, selected_line, file_line_map)
   api.nvim_buf_set_option(buf, "modifiable", true)
   api.nvim_buf_set_lines(buf, 0, -1, false, items)
   api.nvim_buf_set_option(buf, "modifiable", false)
