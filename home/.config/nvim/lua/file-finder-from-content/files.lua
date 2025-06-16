@@ -5,7 +5,7 @@ local ui = require("file-finder-from-content.ui")
 
 local function get_files()  -- TODO check security
   local files = {}
-  local ignored_dirs = { ".git", "node_modules", ".nvim", ".venv" }
+  local ignored_dirs = { ".git", "node_modules", ".nvim", ".venv", "__pycache__" }
   local max_files = 10000
 
   local function is_ignored_dir(dirname)
