@@ -46,7 +46,7 @@ function M.find_files()
   
   ui.setup_highlights()
   
-  ui.buf, ui.win = ui.create_floating_window({ title = "Find Files" })
+  ui.buf, ui.win = ui.create_floating_window()
   ui.prompt_buf, ui.prompt_win = ui.create_prompt_window(ui.win)
 
   local filtered_files = files

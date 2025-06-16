@@ -29,13 +29,11 @@ function M.create_backdrop_window()
   return backdrop_buf, backdrop_win
 end
 
-function M.create_floating_window(opts)
-  opts = opts or {}
-  
+function M.create_floating_window()
   M.backdrop_buf, M.backdrop_win = M.create_backdrop_window()
   
-  local width  = opts.width or (vim.o.columns - 22)
-  local height = opts.height or (vim.o.lines - 8)
+  local width  = vim.o.columns - 22
+  local height = vim.o.lines - 9
   local row = 6
   local col = 10
   
@@ -52,9 +50,7 @@ end
 function M.create_prompt_window(main_win)
   local main_config = api.nvim_win_get_config(main_win)
   local width = main_config.width
-  local row_val = main_config.row
-  if type(row_val) == "table" then row_val = row_val[1] or 0 end
-  local row = row_val + 1
+  local row = 2
   local col_val = main_config.col
   if type(col_val) == "table" then col_val = col_val[1] or 0 end
   local col = 10
