@@ -66,19 +66,12 @@ function M.create_prompt_window(main_win)
 end
 
 function M.setup_highlights()
-  api.nvim_set_hl(0, "FuzzyFinderMatch",    { fg = "#ffff00", bold = true })
-  api.nvim_set_hl(0, "FuzzyFinderSelected", { bg = "#444444" })
-  api.nvim_set_hl(0, "FuzzyFinderBackdrop", { fg = "#666666", blend = 0 })
+  api.nvim_set_hl(0, "FileFinderPath",       { fg = "#ff92df" })
+  api.nvim_set_hl(0, "FileFinderLineNumber", { fg = "#777777" })
+  api.nvim_set_hl(0, "FileFinderSelected",   { bg = "#444444" })
 end
 
-function M.highlight_line(buf, line_num, pattern, text)
-  local scoring = require("file-finder-from-content.scoring")
-  local matches = {}  -- TODO get it from args actually
-  api.nvim_buf_clear_namespace(buf, -1, line_num, line_num + 1)
-  for _, col in ipairs(matches) do api.nvim_buf_add_highlight(buf, -1, "FuzzyFinderMatch", line_num, col, col + 1) end
-end
-
-function M.update_results(buf, items, pattern, selected_line, file_line_map)
+function M.update_results(buf, items, selected_line, lines_infos)
   api.nvim_buf_set_option(buf, "modifiable", true)
   api.nvim_buf_set_lines(buf, 0, -1, false, items)
   api.nvim_buf_set_option(buf, "modifiable", false)
@@ -87,8 +80,10 @@ function M.update_results(buf, items, pattern, selected_line, file_line_map)
   
   for i, item in ipairs(items) do
     local line_num = i - 1
-    M.highlight_line(buf, line_num, pattern, item)
-    if line_num == selected_line then api.nvim_buf_add_highlight(buf, -1, "FuzzyFinderSelected", line_num, 0, -1) end
+    for _, color in ipairs(lines_infos[i].colors) do
+      api.nvim_buf_add_highlight(buf, -1, color[1], i - 1, color[2], color[3])
+    end
+    if i - 1 == selected_line then api.nvim_buf_add_highlight(buf, -1, "FuzzyFinderSelected", i - 1, 0, -1) end
   end
 end
 

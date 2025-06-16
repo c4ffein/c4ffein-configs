@@ -52,27 +52,31 @@ function M.find_files()
   local filtered_files = files
   local selected_line = 0
   local pattern = ""
-  local file_line_map = {}
+  local lines_infos = {}
 
   local function update_display()
     local display_items = {}
-    file_line_map = {}
+    lines_infos = {}
     for i = 1, math.min(#filtered_files, 50) do
       local item = filtered_files[i]
       if type(item) == "table" then
-        file_line_map[#display_items] = i
+        -- TODO : ... after file name if more exemples?
         table.insert(display_items, item.file)
+        table.insert(lines_infos, { file = item.file, colors = { { "FileFinderPath", 0, 9000 } } })
         if item.matched_lines and #item.matched_lines > 0 then
           for j, match in ipairs(item.matched_lines) do
-            table.insert(display_items, "  " .. match.line_num .. ": " .. match.content)
+            local line_number = string.rep(' ', math.max(0, 5 - #tostring(match.line_num))) .. match.line_num
+            local content = match.content:gsub("^%s+", "")
+            table.insert(display_items, line_number .. ' ' .. content)
+            table.insert(lines_infos, { file = item.file, colors = { { "FileFinderLineNumber", 0, #line_number } } })
           end
         end
-      else
-        file_line_map[#display_items] = i
+      else  -- TODO refactor the first file list so this case is useless
         table.insert(display_items, item)
+        table.insert(lines_infos, { file = item, colors = {} })
       end
     end
-    ui.update_results(ui.buf, display_items, pattern, selected_line, file_line_map)
+    ui.update_results(ui.buf, display_items, selected_line, lines_infos)
   end
   
   local function on_input_change()
@@ -88,7 +92,7 @@ function M.find_files()
   end
   
   local function select_file()
-    local file_index = file_line_map[selected_line]
+    local file_index = lines_infos[selected_line]  -- TODO Broke this
     if file_index and file_index <= #filtered_files then
       local item = filtered_files[file_index]
       local file = type(item) == "table" and item.file or item
@@ -99,13 +103,9 @@ function M.find_files()
   
   local function move_selection(direction)
     local display_line_count = 0
-    for _, _ in pairs(file_line_map) do display_line_count = display_line_count + 1 end
-    local max_line = math.min(display_line_count - 1, 49)
-
-    repeat
-      selected_line = math.max(0, math.min(max_line, selected_line + direction))
-    until file_line_map[selected_line] or selected_line == 0 or selected_line == max_line
-
+    for _, _ in pairs(lines_infos) do display_line_count = display_line_count + 1 end
+    local max_line = math.min(math.min(display_line_count - 1, 49), #lines_infos)
+    selected_line = math.max(0, math.min(max_line, selected_line + direction))
     update_display()
     vim.api.nvim_win_set_cursor(ui.win, {selected_line + 1, 0})
   end
