@@ -27,6 +27,8 @@ noremap <C-j> <left>
 noremap <C-k> <down>
 noremap <C-l> <right>
 
+noremap V <C-v>
+
 vnoremap H I
 vnoremap h c
 
@@ -60,7 +62,6 @@ set ttyfast
 " au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\"" | endif
 ]])
 
--- TODO V is not visual line but visual on the word?
 
 vim.cmd('colorscheme c4ffein')
 
@@ -77,7 +78,7 @@ function select_current_word()
   vim.api.nvim_win_set_cursor(0, { row, w_start - 1 }); vim.cmd('normal! v')
   vim.api.nvim_win_set_cursor(0, { row, ((w_end ~= 0 and w_end) or 1) - 1 })
 end
-vim.keymap.set('n', 'V', select_current_word, { desc = 'select word' })
+vim.keymap.set('n', '<C-v>', select_current_word, { desc = 'select word' })
 
 require('file-finder').setup()
 require('file-finder-from-content').setup()
