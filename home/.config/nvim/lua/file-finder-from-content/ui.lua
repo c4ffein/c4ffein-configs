@@ -83,7 +83,7 @@ function M.update_results(buf, items, selected_line, lines_infos)
     for _, color in ipairs(lines_infos[i].colors) do
       api.nvim_buf_add_highlight(buf, -1, color[1], i - 1, color[2], color[3])
     end
-    if i - 1 == selected_line then api.nvim_buf_add_highlight(buf, -1, "FuzzyFinderSelected", i - 1, 0, -1) end
+    if i == selected_line then api.nvim_buf_add_highlight(buf, -1, "FuzzyFinderSelected", i, 0, -1) end
   end
 end
 

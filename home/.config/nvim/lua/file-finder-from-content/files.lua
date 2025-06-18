@@ -5,7 +5,7 @@ local ui = require("file-finder-from-content.ui")
 
 local function get_files()  -- TODO check security
   local files = {}
-  local ignored_dirs = { ".git", "node_modules", ".nvim", ".venv", "__pycache__" }
+  local ignored_dirs = { ".git", "node_modules", ".nvim", ".venv", "__pycache__", ".ruff_cache" }
   local max_files = 10000
 
   local function is_ignored_dir(dirname)
@@ -50,7 +50,7 @@ function M.find_files()
   ui.prompt_buf, ui.prompt_win = ui.create_prompt_window(ui.win)
 
   local filtered_files = files
-  local selected_line = 0
+  local selected_line = 1
   local pattern = ""
   local lines_infos = {}
 
@@ -68,7 +68,14 @@ function M.find_files()
             local line_number = string.rep(' ', math.max(0, 5 - #tostring(match.line_num))) .. match.line_num
             local content = match.content:gsub("^%s+", "")
             table.insert(display_items, line_number .. ' ' .. content)
-            table.insert(lines_infos, { file = item.file, colors = { { "FileFinderLineNumber", 0, #line_number } } })
+            table.insert(
+              lines_infos,
+              {
+                file = item.file,
+                colors = { { "FileFinderLineNumber", 0, #line_number } },
+                line_number = match.line_num
+              }
+            )
           end
         end
       else  -- TODO refactor the first file list so this case is useless
@@ -86,28 +93,25 @@ function M.find_files()
     if new_pattern ~= pattern then
       pattern = new_pattern
       filtered_files = scoring.filter(pattern, files)
-      selected_line = 0
+      selected_line = 1
       update_display()
     end
   end
   
   local function select_file()
-    local file_index = lines_infos[selected_line]  -- TODO Broke this
-    if file_index and file_index <= #filtered_files then
-      local item = filtered_files[file_index]
-      local file = type(item) == "table" and item.file or item
-      ui.close()
-      vim.cmd("edit " .. vim.fn.fnameescape(file))
-    end
+    local line_infos = lines_infos[selected_line]
+    ui.close()
+    if not line_infos.line_number then vim.cmd("edit ".. vim.fn.fnameescape(line_infos.file))
+    else vim.cmd("edit +" .. line_infos.line_number .. " " .. vim.fn.fnameescape(line_infos.file)) end
   end
   
   local function move_selection(direction)
     local display_line_count = 0
     for _, _ in pairs(lines_infos) do display_line_count = display_line_count + 1 end
     local max_line = math.min(math.min(display_line_count - 1, 49), #lines_infos)
-    selected_line = math.max(0, math.min(max_line, selected_line + direction))
+    selected_line = math.max(1, math.min(max_line + 1, selected_line + direction))
     update_display()
-    vim.api.nvim_win_set_cursor(ui.win, {selected_line + 1, 0})
+    vim.api.nvim_win_set_cursor(ui.win, {selected_line, 0})
   end
   
   vim.api.nvim_buf_attach(ui.prompt_buf, false, { on_lines = function() vim.schedule(on_input_change) end })
