@@ -3,13 +3,13 @@ local M = {}
 function M.score(pattern, str, skip_regex_matching)  -- TODO also return pos
   -- WARNING `find` raises on ["(" => ""] and ["t(" => "tt(("] but doesnt raise on ["t(" => ""]
   -- no easy and reliable way to do a pre-check, so just update the skip_regex_matching on first fail
-  local plain_pos = str:find(pattern, 1, true)  -- start at first char and plain text matching
-  if plain_pos                   then return skip_regex_matching, 3 end
-  if skip_regex_matching         then return skip_regex_matching, 0 end
-  local worked, pattern_pos = pcall(string.find, str, pattern)    -- now does pattern matching
-  if not worked                  then return true,                0 end
-  if pattern_pos                 then return skip_regex_matching, 1 end
-  return                                     skip_regex_matching, 0
+  local start_pos, end_pos = str:find(pattern, 1, true)  -- start at first char and plain text matching
+  if start_pos                       then return skip_regex_matching, 3, start_pos, end_pos end
+  if skip_regex_matching             then return skip_regex_matching, 0, start_pos, end_pos end
+  local worked, start_pos, end_pos = pcall(string.find, str, pattern)    -- now does pattern matching
+  if not worked                      then return true,                0, start_pos, end_pos end
+  if start_pos                       then return skip_regex_matching, 1, start_pos, end_pos end
+  return                                         skip_regex_matching, 0, start_pos, end_pos
 end
 
 function M.filter(pattern, items, key_func)
@@ -21,16 +21,16 @@ function M.filter(pattern, items, key_func)
   
   for _, item in ipairs(items) do
     local key, item_score, current_score = key_func(item), 0, 0
-    skip_regex_matching, current_score = M.score(pattern, item, skip_regex_matching)
+    skip_regex_matching, current_score, start_pos, end_pos = M.score(pattern, item, skip_regex_matching)
     item_score = current_score * 1000
     local matched_lines = {}
     local line_num = 0
     for line in io.lines(item) do
       line_num = line_num + 1
-      skip_regex_matching, current_score = M.score(pattern, line, skip_regex_matching)
+      skip_regex_matching, current_score, start_pos, end_pos = M.score(pattern, line, skip_regex_matching)
       item_score = item_score + current_score
       if current_score > 0 and #matched_lines < 3 then
-        table.insert(matched_lines, {line_num = line_num, content = line})
+        table.insert(matched_lines, {line_num = line_num, content = line, start_pos = start_pos, end_pos = end_pos})
       end
     end
     if item_score > 0 then

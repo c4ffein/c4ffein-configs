@@ -67,15 +67,14 @@ function M.find_files()
           for j, match in ipairs(item.matched_lines) do
             local line_number = string.rep(' ', math.max(0, 5 - #tostring(match.line_num))) .. match.line_num
             local content = match.content:gsub("^%s+", "")
+            local color_offset = #content - #match.content + #line_number
             table.insert(display_items, line_number .. ' ' .. content)
-            table.insert(
-              lines_infos,
-              {
-                file = item.file,
-                colors = { { "FileFinderLineNumber", 0, #line_number } },
-                line_number = match.line_num
-              }
-            )
+            table.insert(lines_infos, {
+              file = item.file,
+              colors = { { "FileFinderLineNumber", 0,                              #line_number                     },
+                         { "FileFinderLineMatch",  color_offset + match.start_pos, color_offset + match.end_pos + 1 } },
+              line_number = match.line_num
+            } )
           end
         end
       else  -- TODO refactor the first file list so this case is useless

@@ -66,9 +66,10 @@ function M.create_prompt_window(main_win)
 end
 
 function M.setup_highlights()
-  api.nvim_set_hl(0, "FileFinderPath",       { fg = "#ff92df" })
+  api.nvim_set_hl(0, "FileFinderPath",       { fg = "#BB88FF" })
   api.nvim_set_hl(0, "FileFinderLineNumber", { fg = "#777777" })
-  api.nvim_set_hl(0, "FileFinderSelected",   { bg = "#444444" })
+  api.nvim_set_hl(0, "FileFinderLineMatch",  { fg = "#FF92DF" })
+  api.nvim_set_hl(0, "FileFinderSelected",   { bg = "#444444" })  -- TODO choose colors
 end
 
 function M.update_results(buf, items, selected_line, lines_infos)
@@ -79,21 +80,21 @@ function M.update_results(buf, items, selected_line, lines_infos)
   api.nvim_buf_clear_namespace(buf, -1, 0, -1)
   
   for i, item in ipairs(items) do
-    local line_num = i - 1
+    -- if i == selected_line then api.nvim_buf_add_highlight(buf, -1, "FileFinderSelected", i, 0, -1) end  -- TODO
     for _, color in ipairs(lines_infos[i].colors) do
       api.nvim_buf_add_highlight(buf, -1, color[1], i - 1, color[2], color[3])
     end
-    if i == selected_line then api.nvim_buf_add_highlight(buf, -1, "FuzzyFinderSelected", i, 0, -1) end
   end
 end
 
 function M.close()
-  if M.prompt_win and api.nvim_win_is_valid(M.prompt_win) then api.nvim_win_close(M.prompt_win, true)              end
-  if M.win        and api.nvim_win_is_valid(M.win)        then api.nvim_win_close(M.win, true)                     end
-  if M.backdrop_win and api.nvim_win_is_valid(M.backdrop_win) then api.nvim_win_close(M.backdrop_win, true)        end
-  if M.prompt_buf and api.nvim_buf_is_valid(M.prompt_buf) then api.nvim_buf_delete(M.prompt_buf, { force = true }) end
-  if M.buf        and api.nvim_buf_is_valid(M.buf)        then api.nvim_buf_delete(M.buf, { force = true })        end
-  if M.backdrop_buf and api.nvim_buf_is_valid(M.backdrop_buf) then api.nvim_buf_delete(M.backdrop_buf, { force = true }) end
+  local forced = { force = true }
+  if M.prompt_win   and api.nvim_win_is_valid(M.prompt_win)   then api.nvim_win_close( M.prompt_win,   true)   end
+  if M.win          and api.nvim_win_is_valid(M.win)          then api.nvim_win_close( M.win,          true)   end
+  if M.backdrop_win and api.nvim_win_is_valid(M.backdrop_win) then api.nvim_win_close( M.backdrop_win, true)   end
+  if M.prompt_buf   and api.nvim_buf_is_valid(M.prompt_buf)   then api.nvim_buf_delete(M.prompt_buf,   forced) end
+  if M.buf          and api.nvim_buf_is_valid(M.buf)          then api.nvim_buf_delete(M.buf,          forced) end
+  if M.backdrop_buf and api.nvim_buf_is_valid(M.backdrop_buf) then api.nvim_buf_delete(M.backdrop_buf, forced) end
   M.buf = nil; M.win = nil; M.prompt_buf = nil; M.prompt_win = nil; M.backdrop_buf = nil; M.backdrop_win = nil
 end
 
