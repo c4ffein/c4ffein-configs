@@ -41,6 +41,18 @@ local function get_files()  -- TODO check security
 end
 
 function M.find_files()
+  local function get_visual_selection()  -- TODO use me
+    local start_ds, end_ds = vim.fn.getpos("v"), vim.fn.getpos(".")
+    -- if there is no current selection, could try previous selection with vim.fn.getpos("'<") and vim.fn.getpos("'>")
+    local start_bufnum, start_lnum, start_col, start_off = start_ds[1], start_ds[2], start_ds[3], start_ds[4]
+    local   end_bufnum,   end_lnum,   end_col,   end_off =   end_ds[1],   end_ds[2],   end_ds[3],   end_ds[4]
+    if start_lnum == 0 or end_lnum == 0 then return "" end  -- Invalid selection (returns { 0, 0, 0, 0 })
+    if start_bufnum ~= end_bufnum or start_lnum ~= end_lnum then return "" end  -- Could show a warning, simpler now
+    local lines = vim.fn.getregion(start_ds, end_ds)
+    if #lines == 0 then return "" end
+    return lines[1]
+  end
+
   local files = get_files()
   if #files == 0 then vim.notify("No files found", vim.log.levels.WARN) return end  -- TODO custom
   
