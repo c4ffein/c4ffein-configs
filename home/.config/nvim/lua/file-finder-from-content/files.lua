@@ -41,6 +41,8 @@ local function get_files()  -- TODO check security
 end
 
 local function get_visual_selection()
+  local mode = vim.fn.mode()
+  if mode ~= 'v' and mode ~= 'V' and mode ~= '\22' then return "" end  -- Only works if currently selected
   local start_ds, end_ds = vim.fn.getpos("v"), vim.fn.getpos(".")
   -- if there is no current selection, could try previous selection with vim.fn.getpos("'<") and vim.fn.getpos("'>")
   local start_bufnum, start_lnum, start_col, start_off = start_ds[1], start_ds[2], start_ds[3], start_ds[4]
