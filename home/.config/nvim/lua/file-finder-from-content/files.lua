@@ -3,40 +3,40 @@ local M = {}
 local scoring = require("file-finder-from-content.scoring")
 local ui = require("file-finder-from-content.ui")
 
+local function is_ignored_dir(dirname, ignored_dirs)
+  for _, ignored in ipairs(ignored_dirs) do if dirname == ignored then return true end end
+  return false
+end
+
+local function is_symlink(path) local stat = vim.loop.fs_lstat(path); return stat and stat.type == 'link' end
+
 -- TODO + and - to get more and less lines per file
-local function get_files()  -- TODO check security
+
+local function get_files()
+  -- doesn't follow symlinks - could add all targets to (links to check / results) if they don't exist, keeping naive rn
   local files = {}
   local ignored_dirs = { ".git", "node_modules", ".nvim", ".venv", "__pycache__", ".ruff_cache" }
   local max_files = 10000
 
-  local function is_ignored_dir(dirname)
-    for _, ignored in ipairs(ignored_dirs) do if dirname == ignored then return true end end
-    return false
-  end
-  local function is_symlink(path) local stat = vim.loop.fs_lstat(path); return stat and stat.type == 'link' end
-
   local function scan_dir(path, relative_path)
     if #files >= max_files then vim.notify("Too many files in tree", vim.log.levels.WARN); return end  -- TODO custom
-    
     local items = vim.fn.readdir(path)
     if not items then return end
-    
     for _, item in ipairs(items) do
       local item_path = path .. "/" .. item
-
       if vim.fn.isdirectory(item_path) == 1 then
-        if not is_ignored_dir(item) and not is_symlink(item) then
+        if not is_ignored_dir(item, ignored_dirs) and not is_symlink(item_path) then  -- prevent loops, no dir symlinks
           local new_relative = relative_path == "" and item or relative_path .. "/" .. item
           scan_dir(item_path, new_relative)
         end
-      else  -- TODO here, could be a symlink, what if the target is malformed on purpose
+      else
         local file_path = relative_path == "" and item or relative_path .. "/" .. item
-        table.insert(files, file_path)
-        if #files >= max_files then vim.notify("Too many files in tree", vim.log.levels.WARN); break end  -- TODO custom
+        if not is_symlink(item_path) then table.insert(files, file_path) end
       end
+      if #files >= max_files then vim.notify("Too many files in tree", vim.log.levels.WARN); break end  -- TODO custom
     end
   end
-  
+
   scan_dir(".", "")
   return files
 end
