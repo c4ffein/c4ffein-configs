@@ -1,9 +1,0 @@
-{"install":[
-["download", "https://github.com/rsc/2fa/archive/refs/tags/v1.2.0.tar.gz", "d8db6b9a714c9146a4b82fd65b54f9bdda3e58380bce393f45e1ef49e4e9bee5", "2fa-1.2.0.tar.gz"],
-["tar.xz", "2fa-1.2.0.tar.gz", ".local/external/2fa"],
-["cd", ".local/external/2fa/2fa-1.2.0"],
-["set", "VENDOR_MODULES.TXT", ["$", "# github.com/atotto/clipboard v0.1.2", "## explicit", "github.com/atotto/clipboard"]],
-["write", ".local/external/2fa/2fa-1.2.0/vendor/modules.txt", "VENDOR_MODULES.TXT"],
-["hexec", ".local/bin/go", ["go", "build", "-mod", "vendor"]],
-["lns", ".local/external/2fa/2fa-1.2.0/2fa", ".local/bin/2fa"]
-]}
