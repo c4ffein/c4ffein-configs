@@ -1,8 +1,0 @@
-{"install":[
-["download", "https://github.com/OfflineIMAP/imapfw/archive/refs/tags/v0.027.tar.gz", "4a956bfbab3208ea08190a1290af5f52411b08ffee884e4f9059b19ec68eb712", "v0.027.tar.gz"],
-["tar.xz", "v0.027.tar.gz", ".local/external/imapfw"],
-["cd", ".local/external/imapfw/imapfw-0.027"],
-["replace line", ".local/external/imapfw/imapfw-0.027/imapfw/edmp.py", 294, "        def asyn(topic):"],
-["replace line", ".local/external/imapfw/imapfw-0.027/imapfw/edmp.py", 321, "            setattr(self, topic, asyn(topic))"],
-["lns", ".local/external/imapfw/imapfw-0.027/imapfw.py", ".local/bin/imapfw"]
-]}
