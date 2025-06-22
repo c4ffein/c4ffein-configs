@@ -3,6 +3,7 @@ local M = {}
 local scoring = require("file-finder-from-content.scoring")
 local ui = require("file-finder-from-content.ui")
 
+-- TODO + and - to get more and less lines per file
 local function get_files()  -- TODO check security
   local files = {}
   local ignored_dirs = { ".git", "node_modules", ".nvim", ".venv", "__pycache__", ".ruff_cache" }
