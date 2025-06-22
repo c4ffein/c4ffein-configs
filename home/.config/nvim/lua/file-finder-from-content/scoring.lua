@@ -46,7 +46,6 @@ function M.filter(pattern, items, key_func)
   for _, scored_item in ipairs(scored_items) do
     table.insert(result, {file = scored_item.item, matched_lines = scored_item.matched_lines})
   end
-  
   return result
 end
 

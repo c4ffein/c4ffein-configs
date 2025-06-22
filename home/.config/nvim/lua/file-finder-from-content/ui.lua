@@ -47,7 +47,7 @@ function M.create_floating_window()
   return buf, win
 end
 
-function M.create_prompt_window(main_win)
+function M.create_prompt_window(main_win, first_pattern)
   local main_config = api.nvim_win_get_config(main_win)
   local width = main_config.width
   local row = 2
