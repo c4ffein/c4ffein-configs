@@ -1,5 +1,0 @@
-{"install":[
-["download", "https://github.com/neovim/neovim/releases/download/v0.7.2/nvim-linux64.tar.gz", "fa75852890ca4b57551da194c696d3bbd14d9d2e966bc188d1e7e52ee942b71d", "nvim-linux64.tar.gz"],
-["tar.xz", "nvim-linux64.tar.gz", ".local/external/nvim"],
-["lns", ".local/external/nvim/nvim-linux64/bin/nvim", ".local/bin/vi"]
-]}
