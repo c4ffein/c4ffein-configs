@@ -1,13 +1,19 @@
 local M = {}
 
-function M.score(pattern, str, skip_regex_matching)  -- TODO also return pos
+function M.score(pattern, str, skip_regex_matching)
   -- WARNING `find` raises on ["(" => ""] and ["t(" => "tt(("] but doesnt raise on ["t(" => ""]
   -- no easy and reliable way to do a pre-check, so just update the skip_regex_matching on first fail
-  local start_pos, end_pos = str:find(pattern, 1, true)  -- start at first char and plain text matching
+  local low_str, low_pattern = str:lower(), pattern:lower()
+  local start_pos, end_pos =     str:find(    pattern, 1, true)  -- start at first char and plain text matching
+  if start_pos                       then return skip_regex_matching, 6, start_pos, end_pos end
+  local start_pos, end_pos = low_str:find(low_pattern, 1, true)  -- start at first char and plain text matching (low)
   if start_pos                       then return skip_regex_matching, 3, start_pos, end_pos end
   if skip_regex_matching             then return skip_regex_matching, 0, start_pos, end_pos end
-  local worked, start_pos, end_pos = pcall(string.find, str, pattern)    -- now does pattern matching
+  local worked, start_pos, end_pos = pcall(string.find,     str,     pattern)    -- now does pattern matching
   if not worked                      then return true,                0, start_pos, end_pos end
+  if start_pos                       then return skip_regex_matching, 2, start_pos, end_pos end
+  local worked, start_pos, end_pos = pcall(string.find, low_str, low_pattern)    -- now does pattern matching (low)
+  if not worked                      then return skip_regex_matching, 0, start_pos, end_pos end
   if start_pos                       then return skip_regex_matching, 1, start_pos, end_pos end
   return                                         skip_regex_matching, 0, start_pos, end_pos
 end
