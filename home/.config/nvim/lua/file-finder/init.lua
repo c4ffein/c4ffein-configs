@@ -93,7 +93,6 @@ function M.setup()
   -- TODO o for previous plugin
   vim.keymap.set("n", "o",     ui.start_history_only, {desc = "Find files (history only)", silent = true})
   vim.keymap.set("n", "O",     ui.start             , {desc = "Find files", silent = true})
-  vim.keymap.set("n", "<C-o>", ui.start             , {desc = "Find files", silent = true})
   vim.keymap.set("x", "<C-o>", ui.start             , {desc = "Find files", silent = true})
   -- TODO C-o in the plugin should switch between 2 modes (o and O)
   -- TODO command to start the reimplem of the regular file manager
