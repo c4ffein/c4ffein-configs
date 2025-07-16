@@ -14,6 +14,7 @@ local MAX_SAVED_FILES = 80
 -- TODO when all exhausted, also search for all files in the current dir, ignoring special dirs, like the O version?
 -- TODO   - by default: node_module(s?), .venv ... => Should be common with O?
 -- TODO should merge the o and O version
+-- TODO when you add a file outside cd through the file explorer, it is still added to the current history
 
 -- TODO ADAPT
 -- local home_path = os.getenv('HOME') or os.getenv('USERPROFILE') -- Unix or Windows
