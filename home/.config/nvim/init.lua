@@ -82,4 +82,3 @@ vim.keymap.set('n', '<C-v>', select_current_word, { desc = 'select word' })
 vim.keymap.set('n', '<C-o>', ':Explore<CR>', { desc = 'open file explorer' })
 
 require('file-finder').setup()
-require('file-finder-from-content').setup()
