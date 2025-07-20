@@ -68,7 +68,6 @@ function M.load_history_for_ui()
   local filename, current_directory, limit = config.data_file, config.current_directory, config.MAX_PRINTABLE_FILES
   local loaded_table, error_message = M.load_history(filename)
   if loaded_table == nil or error_message then return nil, error_message end
-  if current_directory:sub(-1) ~= "/" then current_directory = current_directory .. "/" end -- sanitize current dir
   local result = {}
   local set_of_known_paths = {}
   for _, entry in ipairs(loaded_table) do
@@ -114,7 +113,6 @@ function M.append_to_history(history_file_path, added_to_history_file_path, curr
   local current_history, error_msg = M.load_history(history_file_path)
   if error_msg then return false, error_msg end
   local new_history = {}
-  if current_directory:sub(-1) ~= "/" then current_directory = current_directory .. "/" end -- trailing slash
   table.insert(new_history, { [PART_FILEPATH] = added_to_history_file_path, [PART_CURRENT_DIR] = current_directory })
   for _, entry in ipairs(current_history) do
     if entry[PART_CURRENT_DIR]:sub(-1) ~= "/" then entry[PART_CURRENT_DIR] = entry[PART_CURRENT_DIR] .. "/" end

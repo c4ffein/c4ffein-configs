@@ -7,8 +7,13 @@ M.MAX_PRINTABLE_FILES = 9000 -- a filter will be passed on the printable files, 
 
 -- not really config past this line but state, should probably refactor
 
+M.set_current_directory = function(current_directory)
+  M.current_directory = current_directory -- WARNING must always end with a trailing slash
+  if M.current_directory:sub(-1) ~= "/" then M.current_directory = M.current_directory .. "/" end
+end
+
 M.data_path = vim.fn.stdpath("data") .. "/file-finder"
 M.data_file = vim.fn.stdpath("data") .. "/file-finder/history"
-M.current_directory = vim.uv.cwd()
+M.set_current_directory(vim.uv.cwd())
 
 return M

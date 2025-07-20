@@ -9,8 +9,6 @@ local history = require("file-finder.history")
 -- TODO you can set cd from the file explorer
 -- TODO o should behave like previous plugin, C-o in the plugin should switch between 2 modes (o and O)
 -- TODO ADAPT, merge what is needed
--- local home_path = os.getenv('HOME') or os.getenv('USERPROFILE') -- Unix or Windows
--- local data_path = vim.fn.stdpath('data') .. '/' .. PLUGIN_NAME .. '/' -- ~/.local/share/nvim/file-finder/ probably
 -- local function find_index(table, value)
 --     for i, v in ipairs(table) do if v == value then return i end end return nil
 -- end

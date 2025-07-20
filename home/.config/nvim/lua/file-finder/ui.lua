@@ -1,5 +1,6 @@
 local M = {}
 
+local config = require("file-finder.config")
 local files = require("file-finder.files")
 local history = require("file-finder.history")
 local scoring = require("file-finder.scoring")
@@ -20,9 +21,8 @@ M.main_col,     M.prompt_col,         M.backdrop_col         =   0,   0,   0
 M.main_blend,   M.prompt_blend,       M.backdrop_blend       = 100, 100, 100
 M.lines_infos = {}
 
-function M.set_windows_characterisitcs(history_only_mode)
-  M.history_only_mode = history_only_mode
-  if history_only_mode then
+function M.set_windows_characterisitcs()
+  if M.history_only_mode then
     M.main_width, M.main_height     = 100, 22
     M.main_row,   M.main_col        = ceil((vim.o.lines - M.main_height)) / 2, ceil((vim.o.columns - M.main_width) / 2)
     M.main_blend, M.backdrop_blend  = 5, 100
@@ -80,7 +80,9 @@ end
 --     for i = 48,  57 do add_hook(search_buf_id, string.char(i)) end  -- 0 to 9
 
 function M.setup_highlights()
-  api.nvim_set_hl(0, "FileFinderPath",       { fg = "#BB88FF" })
+  api.nvim_set_hl(0, "FileFinderPathCd",     { fg = "#BB88FF" })
+  api.nvim_set_hl(0, "FileFinderPathHome",   { fg = "#FF6E6E" })
+  api.nvim_set_hl(0, "FileFinderPathRoot",   { fg = "#88EEFF" })
   api.nvim_set_hl(0, "FileFinderLineNumber", { fg = "#777777" })
   api.nvim_set_hl(0, "FileFinderLineMatch",  { fg = "#FF92DF" })
   api.nvim_set_hl(0, "FileFinderSelected",   { bg = "#444444" })  -- TODO choose colors
@@ -101,9 +103,9 @@ function M.update_results(buf, items, selected_line)
   end
 end
 
-function M.show_windows(history_only_mode)
+function M.show_windows()
   if M.prompt_win or M.win or M.backdrop_win or M.prompt_buf or M.buf or M.backdrop_buf then M.close_windows() end
-  M.set_windows_characterisitcs(history_only_mode)
+  M.set_windows_characterisitcs()
   M.backdrop_buf, M.backdrop_win = M.create_backdrop_window()
   M.buf,          M.win          = M.create_floating_window()
   M.prompt_buf,   M.prompt_win   = M.create_prompt_window(M.win)
@@ -141,8 +143,32 @@ local function update_display(filtered_files)
     local item = filtered_files[i]
     if type(item) == "table" then
       -- TODO : ... after file name if more exemples?
-      table.insert(display_items, item.file)
-      table.insert(M.lines_infos, { file = item.file, colors = { { "FileFinderPath", 0, 9000 } } })
+      if not M.history_only_mode then
+        table.insert(display_items, item.file)
+        table.insert(M.lines_infos, { file = item.file, colors = { { "FileFinderPathCd", 0, 9000 } } })
+      else
+        local path_starter, full_path, selected_color = "/", item.file, "FileFinderPathRoot"
+        local line_number_as_str = tostring(i - 1)
+        if i <  11 then line_number_as_str = " " .. line_number_as_str end
+        if i < 101 then line_number_as_str = " " .. line_number_as_str end
+        if full_path:sub(1, #config.current_directory) == config.current_directory then
+          path_starter, selected_color = ".", "FileFinderPathCd"
+          full_path = full_path:sub(#config.current_directory + 1, #full_path)
+        elseif full_path:sub(1, #files.HOME) == files.HOME then
+          path_starter, selected_color = "~", "FileFinderPathHome"
+          full_path = full_path:sub(#files.HOME + 1, #full_path)
+        else
+          full_path = full_path:sub(2, #full_path)
+        end
+        if i > 10 then selected_color = "FileFinderLineNumber" end
+        local reversed_slash_pos = full_path:reverse():find("/")
+        local slash_pos = reversed_slash_pos and #full_path - reversed_slash_pos + 1 or 1 -- 1 if not found
+        table.insert(
+          display_items, line_number_as_str .. " " .. path_starter .. " " .. full_path .. " " .. tostring(i - 1)
+        )
+        local colors = { { selected_color, 0, slash_pos + 6 }, { selected_color, #full_path + 6, 9000 } }
+        table.insert(M.lines_infos, { file = item.file, colors = colors })
+      end
       if item.matched_lines and #item.matched_lines > 0 and not M.history_only_mode then
         for j, match in ipairs(item.matched_lines) do
           local line_number = string.rep(' ', math.max(0, 5 - #tostring(match.line_num))) .. match.line_num
@@ -166,14 +192,15 @@ local function update_display(filtered_files)
 end
 
 function M.start(history_only_mode)
+  M.history_only_mode = history_only_mode
   local visual_selection = get_visual_selection()  -- get this value before UI setup
 
   local all_files_from_tree = files.get_files()
   local all_files_from_history = history.load_history_for_ui()
-  local obtained_files = history_only_mode and all_files_from_history or all_files_from_tree
+  local obtained_files = M.history_only_mode and all_files_from_history or all_files_from_tree
 
   M.setup_highlights()
-  M.show_windows(history_only_mode)
+  M.show_windows()
 
   local filtered_files = obtained_files
   local selected_line = 1

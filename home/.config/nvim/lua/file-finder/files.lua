@@ -2,6 +2,9 @@ local M = {}
 
 local scoring = require("file-finder.scoring")
 
+M.HOME = vim.env.HOME or vim.env.USERPROFILE -- USERPROFILE for Windows
+if M.HOME:sub(-1) ~= "/" then M.HOME = M.HOME .. "/" end
+
 local function is_ignored_dir(dirname, ignored_dirs)
   for _, ignored in ipairs(ignored_dirs) do if dirname == ignored then return true end end
   return false
