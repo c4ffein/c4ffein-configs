@@ -65,7 +65,7 @@ end
 
 function M.load_history_for_ui()
   -- Returns table_to_print, error_message
-  local filename, current_directory, limit = config.data_file, config.current_directory, config.MAX_SAVED_FILES
+  local filename, current_directory, limit = config.data_file, config.current_directory, config.MAX_PRINTABLE_FILES
   local loaded_table, error_message = M.load_history(filename)
   if loaded_table == nil or error_message then return nil, error_message end
   if current_directory:sub(-1) ~= "/" then current_directory = current_directory .. "/" end -- sanitize current dir

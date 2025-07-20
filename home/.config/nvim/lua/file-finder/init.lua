@@ -19,7 +19,7 @@ local history = require("file-finder.history")
 --     if not popup_buf_id or not vim.api.nvim_buf_is_valid(popup_buf_id) then
 --         return
 --     end
---     local unfiltered_files = get_opened_files_in_table()
+--     local unfiltered_files = REMOVED_CALL
 --     local old_files = {}
 --     local old_files_lines = {}
 -- 
@@ -59,7 +59,6 @@ local history = require("file-finder.history")
 --     if M.filtered_files and M.filtered_files[tonumber(key) + 1] then
 --         local file_path = M.filtered_files[tonumber(key) + 1]
 --         close_popup()
---         mark_open_from_name(file_path)
 --         vim.cmd('edit ' .. vim.fn.fnameescape(file_path))
 --     else close_popup() end
 -- end
@@ -82,10 +81,11 @@ end
 
 M.start = ui.start
 
-vim.api.nvim_create_autocmd({"VimEnter", "BufReadPost", "BufNewFile"}, {
+vim.api.nvim_create_autocmd({"VimEnter", "BufReadPost"}, {
   callback = function()
+    opened_file = vim.fn.expand("%:p")
     vim.fn.mkdir(config.data_path, "p")
-    history.append_to_history(config.data_file, config.opened_file, config.current_directory, config.MAX_SAVED_FILES)
+    history.append_to_history(config.data_file, opened_file, config.current_directory, config.MAX_SAVED_FILES)
   end
 })
 

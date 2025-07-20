@@ -168,9 +168,9 @@ end
 function M.start(history_only_mode)
   local visual_selection = get_visual_selection()  -- get this value before UI setup
 
-  local obtained_files = files.get_files()
-  if #obtained_files == 0 then vim.notify("No files found", vim.log.levels.WARN) return end  -- TODO custom
-  local file_history = history.load_history_for_ui()
+  local all_files_from_tree = files.get_files()
+  local all_files_from_history = history.load_history_for_ui()
+  local obtained_files = history_only_mode and all_files_from_history or all_files_from_tree
 
   M.setup_highlights()
   M.show_windows(history_only_mode)
@@ -185,7 +185,7 @@ function M.start(history_only_mode)
     
     if new_pattern ~= pattern then
       pattern = new_pattern
-      filtered_files = scoring.filter(pattern, obtained_files)
+      filtered_files = scoring.filter(pattern, all_files_from_tree)
       selected_line = 1
       update_display(filtered_files)
     end
@@ -194,8 +194,7 @@ function M.start(history_only_mode)
   local function select_file()
     local line_infos = M.lines_infos[selected_line]
     M.close_windows()
-    if not line_infos.line_number then vim.cmd("edit ".. vim.fn.fnameescape(line_infos.file))
-    else vim.cmd("edit +" .. line_infos.line_number .. " " .. vim.fn.fnameescape(line_infos.file)) end
+    files.open_file(line_infos.file, line_infos.line_number)
   end
   
   local function move_selection(direction)
