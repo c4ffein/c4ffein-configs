@@ -12,6 +12,8 @@
 
 local M = {}
 
+local config = require("file-finder.config")
+
 local FILE_HEADER = "C4NV-history-v0.0.0\0\n" -- KISS for now
 
 local PART_FILEPATH = "1"
@@ -61,8 +63,9 @@ function M.load_history(filename)
   return chunks, nil
 end
 
-function M.load_history_for_ui(filename, current_directory, limit)
+function M.load_history_for_ui()
   -- Returns table_to_print, error_message
+  local filename, current_directory, limit = config.data_file, config.current_directory, config.MAX_SAVED_FILES
   local loaded_table, error_message = M.load_history(filename)
   if loaded_table == nil or error_message then return nil, error_message end
   if current_directory:sub(-1) ~= "/" then current_directory = current_directory .. "/" end -- sanitize current dir

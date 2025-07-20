@@ -1,14 +1,16 @@
 local M = {}
 
 local files = require("file-finder.files")
+local history = require("file-finder.history")
 local scoring = require("file-finder.scoring")
 local ceil = math.ceil
 
 -- TODO ctrl-o to switch with regular mode (merge it), ijkl to move with next versions
-
+-- TODO would be nice if equivalent scores would get ranked by history
 local api = vim.api
 local fn = vim.fn
 
+M.history_only_mode = false
 M.main_buf,     M.prompt_buf,         M.backdrop_buf         = nil, nil, nil
 M.main_win,     M.prompt_win,         M.backdrop_win         = nil, nil, nil
 M.main_height,  M.prompt_win_height,  M.backdrop_win_height  =  20,  20,  20
@@ -18,8 +20,9 @@ M.main_col,     M.prompt_col,         M.backdrop_col         =   0,   0,   0
 M.main_blend,   M.prompt_blend,       M.backdrop_blend       = 100, 100, 100
 M.lines_infos = {}
 
-function M.set_windows_characterisitcs(minimal)
-  if minimal then
+function M.set_windows_characterisitcs(history_only_mode)
+  M.history_only_mode = history_only_mode
+  if history_only_mode then
     M.main_width, M.main_height     = 100, 22
     M.main_row,   M.main_col        = ceil((vim.o.lines - M.main_height)) / 2, ceil((vim.o.columns - M.main_width) / 2)
     M.main_blend, M.backdrop_blend  = 5, 100
@@ -98,9 +101,9 @@ function M.update_results(buf, items, selected_line)
   end
 end
 
-function M.show_windows(minimal)
+function M.show_windows(history_only_mode)
   if M.prompt_win or M.win or M.backdrop_win or M.prompt_buf or M.buf or M.backdrop_buf then M.close_windows() end
-  M.set_windows_characterisitcs(minimal)
+  M.set_windows_characterisitcs(history_only_mode)
   M.backdrop_buf, M.backdrop_win = M.create_backdrop_window()
   M.buf,          M.win          = M.create_floating_window()
   M.prompt_buf,   M.prompt_win   = M.create_prompt_window(M.win)
@@ -140,7 +143,7 @@ local function update_display(filtered_files)
       -- TODO : ... after file name if more exemples?
       table.insert(display_items, item.file)
       table.insert(M.lines_infos, { file = item.file, colors = { { "FileFinderPath", 0, 9000 } } })
-      if item.matched_lines and #item.matched_lines > 0 then
+      if item.matched_lines and #item.matched_lines > 0 and not M.history_only_mode then
         for j, match in ipairs(item.matched_lines) do
           local line_number = string.rep(' ', math.max(0, 5 - #tostring(match.line_num))) .. match.line_num
           local content = match.content:gsub("^%s+", "")
@@ -167,6 +170,8 @@ function M.start(history_only_mode)
 
   local obtained_files = files.get_files()
   if #obtained_files == 0 then vim.notify("No files found", vim.log.levels.WARN) return end  -- TODO custom
+  local file_history = history.load_history_for_ui()
+
   M.setup_highlights()
   M.show_windows(history_only_mode)
 
@@ -201,7 +206,7 @@ function M.start(history_only_mode)
     update_display(filtered_files)
     vim.api.nvim_win_set_cursor(M.win, {selected_line, 0})
   end
-  
+
   vim.api.nvim_buf_attach(M.prompt_buf, false, { on_lines = function() vim.schedule(on_input_change) end })
  
   local sk = vim.api.nvim_buf_set_keymap

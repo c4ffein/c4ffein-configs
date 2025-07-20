@@ -1,12 +1,8 @@
 local M = {}
 
+local config = require("file-finder.config")
 local ui = require("file-finder.ui")
 local history = require("file-finder.history")
-
-local PLUGIN_NAME = 'file-finder'
-local PLUGIN_LAST_FILES_OPEN_FILE_NAME = 'last_files_open.txt'
-local MAX_SAVED_FILES = 9000
-
 
 -- TODO when using history mode, if history doesn't fill the window, then show files in the dir as with O mode
 -- TODO when you add a file outside cd through the file explorer, it is still added to the current history
@@ -88,12 +84,8 @@ M.start = ui.start
 
 vim.api.nvim_create_autocmd({"VimEnter", "BufReadPost", "BufNewFile"}, {
   callback = function()
-    local data_path = vim.fn.stdpath("data") .. "/file-finder"
-    local data_file = vim.fn.stdpath("data") .. "/file-finder/history"
-    local opened_file = vim.fn.expand("%:p")
-    local current_directory = vim.uv.cwd()
-    vim.fn.mkdir(data_path, "p")
-    history.append_to_history(data_file, opened_file, current_directory, MAX_SAVED_FILES)
+    vim.fn.mkdir(config.data_path, "p")
+    history.append_to_history(config.data_file, config.opened_file, config.current_directory, config.MAX_SAVED_FILES)
   end
 })
 
