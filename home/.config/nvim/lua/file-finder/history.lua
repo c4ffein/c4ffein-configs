@@ -18,30 +18,6 @@ local PART_FILEPATH = "1"
 local PART_CURRENT_DIR = "2"
 local ALLOWED_PARTS = PART_FILEPATH .. PART_CURRENT_DIR
 
-function M.load_history(filename)
-  -- An history file that doesn't start with C4NV-history-v0.0.0\0\n can be considered as empty
-  -- Ignore if there is no history, invalid entries are simply ignored, but a file must start with the correct header
-  -- Now start by reading file
-  local file = io.open(filename, "rb")
-  if not file then return {}, nil end  -- ignore if no history
-  local content = file:read("*all")
-  file:close()
-  local chunks = {}
-  if string.sub(content, 1, #FILE_HEADER) ~= FILE_HEADER then return nil, "no correct header" end
-  -- Split content by \0\n (null byte followed by newline), start just after the len of the accepted header
-  local chunk_start = #FILE_HEADER + 1
-  while chunk_start <= #content do
-    local chunk_end = content:find("\0\n", chunk_start) or #content + 1 -- works whether the file ends with \0\n
-    local chunk_data = content:sub(chunk_start, chunk_end - 1)
-    local chunk_worked, chunk_table = load_chunk(chunk_data)
-    local chunk_verified = chunk_worked and chunk_table and next(chunk_table)
-    chunk_verified = chunk_verified and chunk_table[PART_FILEPATH] and chunk_table[PART_CURRENT_DIR]
-    if chunk_verified then table.insert(chunks, chunk_table) end
-    chunk_start = chunk_end + 2 -- search new chunk past \0\n
-  end
-  return chunks, nil
-end
-
 local function load_chunk(chunk_data)
   -- Load a chunk (a part of the history file containing a file opened entry), returns info_table, error_message
   if #chunk_data == 0 then return nil, "no data" end
@@ -57,7 +33,31 @@ local function load_chunk(chunk_data)
     chunk_table[key_char] = chunk_data:sub(part_start + 2, next_null - 1)
     part_start = next_null
   end
-  if #chunk_table == 0 then return nil, "empty chunk" end return chunk_table, nil
+  if next(chunk_table) == nil then return nil, "empty chunk" end return chunk_table, nil
+end
+
+function M.load_history(filename)
+  -- An history file that doesn't start with C4NV-history-v0.0.0\0\n can be considered as empty
+  -- Ignore if there is no history, invalid entries are simply ignored, but a file must start with the correct header
+  -- Now start by reading file
+  local file = io.open(filename, "rb")
+  if not file then return {}, nil end  -- ignore if no history
+  local content = file:read("*all")
+  file:close()
+  local chunks = {}
+  if string.sub(content, 1, #FILE_HEADER) ~= FILE_HEADER then return nil, "no correct header" end
+  -- Split content by \0\n (null byte followed by newline), start just after the len of the accepted header
+  local chunk_start = #FILE_HEADER + 1
+  while chunk_start <= #content do
+    local chunk_end = content:find("\0\n", chunk_start) or #content + 1 -- works whether the file ends with \0\n
+    local chunk_data = content:sub(chunk_start, chunk_end - 1)
+    local chunk_table, error_message = load_chunk(chunk_data)
+    local chunk_verified = not error_message and chunk_table and next(chunk_table)
+    chunk_verified = chunk_verified and chunk_table[PART_FILEPATH] and chunk_table[PART_CURRENT_DIR]
+    if chunk_verified then table.insert(chunks, chunk_table) end
+    chunk_start = chunk_end + 2 -- search new chunk past \0\n
+  end
+  return chunks, nil
 end
 
 local function write_history(file_path, chunks)
@@ -85,7 +85,7 @@ function M.append_to_history(history_file_path, added_to_history_file_path, curr
   -- WARNING Saving a file creates a temporary file.tmp
   -- Removes duplicates as explained in the top comment
   -- Returns success, error_message
-  local current_history, error_msg = load_history(history_file_path)
+  local current_history, error_msg = M.load_history(history_file_path)
   if error_msg then return false, error_msg end
   local new_history = {}
   if current_directory:sub(-1) ~= "/" then current_directory = current_directory .. "/" end -- trailing slash

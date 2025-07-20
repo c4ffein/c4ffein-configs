@@ -1,23 +1,18 @@
 local M = {}
 
--- local files = require("file-finder.files")
 local ui = require("file-finder.ui")
+local history = require("file-finder.history")
 
 local PLUGIN_NAME = 'file-finder'
 local PLUGIN_LAST_FILES_OPEN_FILE_NAME = 'last_files_open.txt'
-local MAX_SAVED_FILES = 80
+local MAX_SAVED_FILES = 9000
 
 
--- TODO save the previous status per current dir, also save a timestamp for each last opening per dir
--- TODO when executing the algo, merge with saved openings of subdir, smart algo to merge depending on time
--- TODO   - can ignore subdir from the list of checks when it is too old, changes date on each pick
--- TODO when all exhausted, also search for all files in the current dir, ignoring special dirs, like the O version?
--- TODO   - by default: node_module(s?), .venv ... => Should be common with O?
--- TODO should merge the o and O version
+-- TODO when using history mode, if history doesn't fill the window, then show files in the dir as with O mode
 -- TODO when you add a file outside cd through the file explorer, it is still added to the current history
 -- TODO you can set cd from the file explorer
-
--- TODO ADAPT
+-- TODO o should behave like previous plugin, C-o in the plugin should switch between 2 modes (o and O)
+-- TODO ADAPT, merge what is needed
 -- local home_path = os.getenv('HOME') or os.getenv('USERPROFILE') -- Unix or Windows
 -- local data_path = vim.fn.stdpath('data') .. '/' .. PLUGIN_NAME .. '/' -- ~/.local/share/nvim/file-finder/ probably
 -- local function find_index(table, value)
@@ -82,25 +77,24 @@ local MAX_SAVED_FILES = 80
 --     else add_char_to_search(key) end
 -- end
 
--- TODO when using O, selection should be searched for
-
 function M.setup()
-  -- TODO
-  -- ensure_dir(data_path)
-  -- ensure_file(data_path .. PLUGIN_LAST_FILES_OPEN_FILE_NAME)
-  -- vim.api.nvim_set_keymap(
-  --     'n', 'o', ':lua require("' .. PLUGIN_NAME .. '").show_popup()<CR>',  {noremap = true, silent = true}
-  -- )
-  -- vim.api.nvim_create_autocmd("BufEnter", {pattern = "*", callback = mark_open_from_table_of_infos})
-  -- TODO o for previous plugin
   vim.keymap.set("n", "o",     ui.start_history_only, {desc = "Find files (history only)", silent = true})
   vim.keymap.set("n", "O",     ui.start             , {desc = "Find files", silent = true})
   vim.keymap.set("x", "<C-o>", ui.start             , {desc = "Find files", silent = true})
-  -- TODO C-o in the plugin should switch between 2 modes (o and O)
-  -- TODO command to start the reimplem of the regular file manager
   vim.api.nvim_create_user_command("FfFiles", ui.show_windows, {desc = "Find files with scoring"})
 end
 
 M.start = ui.start
+
+vim.api.nvim_create_autocmd({"VimEnter", "BufReadPost", "BufNewFile"}, {
+  callback = function()
+    local data_path = vim.fn.stdpath("data") .. "/file-finder"
+    local data_file = vim.fn.stdpath("data") .. "/file-finder/history"
+    local opened_file = vim.fn.expand("%:p")
+    local current_directory = vim.uv.cwd()
+    vim.fn.mkdir(data_path, "p")
+    history.append_to_history(data_file, opened_file, current_directory, MAX_SAVED_FILES)
+  end
+})
 
 return M
