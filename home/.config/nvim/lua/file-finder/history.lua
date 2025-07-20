@@ -16,7 +16,8 @@ local FILE_HEADER = "C4NV-history-v0.0.0\0\n" -- KISS for now
 
 local PART_FILEPATH = "1"
 local PART_CURRENT_DIR = "2"
-local ALLOWED_PARTS = PART_FILEPATH .. PART_CURRENT_DIR
+
+local function is_valid_part_char(char) return char == PART_FILEPATH or char == PART_CURRENT_DIR end
 
 local function load_chunk(chunk_data)
   -- Load a chunk (a part of the history file containing a file opened entry), returns info_table, error_message
@@ -27,7 +28,7 @@ local function load_chunk(chunk_data)
   while part_start <= #chunk_data do
     if chunk_data:sub(part_start, part_start) ~= "\0" then return nil, "part entry not starting by \\0" end
     local key_char = chunk_data:sub(part_start + 1, part_start + 1)
-    if #key_char == 0 or not ALLOWED_PARTS:find(key_char) then return nil, "part entry unknown" end
+    if #key_char == 0 or not is_valid_part_char(key_char) then return nil, "part entry unknown" end
     local next_null = chunk_data:find("\0", part_start + 2)
     if next_null == nil then next_null = #chunk_data + 1 end -- consider the end of chunk_data as the end of that part
     chunk_table[key_char] = chunk_data:sub(part_start + 2, next_null - 1)
@@ -60,6 +61,26 @@ function M.load_history(filename)
   return chunks, nil
 end
 
+function M.load_history_for_ui(filename, current_directory, limit)
+  -- Returns table_to_print, error_message
+  local loaded_table, error_message = M.load_history(filename)
+  if loaded_table == nil or error_message then return nil, error_message end
+  if current_directory:sub(-1) ~= "/" then current_directory = current_directory .. "/" end -- sanitize current dir
+  local result = {}
+  local set_of_known_paths = {}
+  for _, entry in ipairs(loaded_table) do
+    if #result >= limit then return result, nil end
+    if entry[PART_CURRENT_DIR]:sub(-1) ~= "/" then entry[PART_CURRENT_DIR] = entry[PART_CURRENT_DIR] .. "/" end
+    local entry_cd_match = entry[PART_CURRENT_DIR]:sub(1, #current_directory) == current_directory
+    local entry_file_match = entry[PART_FILEPATH]:sub(1, #current_directory) == current_directory
+    if (entry_cd_match or entry_file_match) and not set_of_known_paths[entry[PART_FILEPATH]] then
+      table.insert(result, { file = entry[PART_FILEPATH], matched_lines = {} })
+      set_of_known_paths[entry[PART_FILEPATH]] = true
+    end
+  end
+  return result, nil
+end
+
 local function write_history(file_path, chunks)
   -- Write the history file, returns did_work, optional_error_message
   -- Use this function on a non-existing file path, then move to your existing history to avoid race conditions
@@ -85,11 +106,13 @@ function M.append_to_history(history_file_path, added_to_history_file_path, curr
   -- WARNING Saving a file creates a temporary file.tmp
   -- Removes duplicates as explained in the top comment
   -- Returns success, error_message
+  if added_to_history_file_path:find("\0", 1, true) then return false, "can't handle \\0 in file name" end
+  if current_directory:find("\0", 1, true) then return false, "can't handle \\0 in current directory" end
   local current_history, error_msg = M.load_history(history_file_path)
   if error_msg then return false, error_msg end
   local new_history = {}
   if current_directory:sub(-1) ~= "/" then current_directory = current_directory .. "/" end -- trailing slash
-  table.insert(new_history, {[PART_FILEPATH] = added_to_history_file_path, [PART_CURRENT_DIR] = current_directory})
+  table.insert(new_history, { [PART_FILEPATH] = added_to_history_file_path, [PART_CURRENT_DIR] = current_directory })
   for _, entry in ipairs(current_history) do
     if entry[PART_CURRENT_DIR]:sub(-1) ~= "/" then entry[PART_CURRENT_DIR] = entry[PART_CURRENT_DIR] .. "/" end
     local entry_not_in_current_dir = entry[PART_CURRENT_DIR]:sub(1, #current_directory) ~= current_directory
