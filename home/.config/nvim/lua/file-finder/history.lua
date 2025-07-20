@@ -10,9 +10,15 @@
 -- When saving, we can remove file duplicates if the one we are saving is from a cd that is or contains the previous cd
 -- WARNING Saving a file creates a temporary file.tmp
 
+local M = {}
+
 local FILE_HEADER = "C4NV-history-v0.0.0\0\n" -- KISS for now
 
-function load_history(filename)
+local PART_FILEPATH = "1"
+local PART_CURRENT_DIR = "2"
+local ALLOWED_PARTS = PART_FILEPATH .. PART_CURRENT_DIR
+
+function M.load_history(filename)
   -- An history file that doesn't start with C4NV-history-v0.0.0\0\n can be considered as empty
   -- Ignore if there is no history, invalid entries are simply ignored, but a file must start with the correct header
   -- Now start by reading file
@@ -28,7 +34,8 @@ function load_history(filename)
     local chunk_end = content:find("\0\n", chunk_start) or #content + 1 -- works whether the file ends with \0\n
     local chunk_data = content:sub(chunk_start, chunk_end - 1)
     local chunk_worked, chunk_table = load_chunk(chunk_data)
-    local chunk_verified = chunk_worked and chunk_table and next(chunk_table) and chunk_table["1"] and chunk_table["2"]
+    local chunk_verified = chunk_worked and chunk_table and next(chunk_table)
+    chunk_verified = chunk_verified and chunk_table[PART_FILEPATH] and chunk_table[PART_CURRENT_DIR]
     if chunk_verified then table.insert(chunks, chunk_table) end
     chunk_start = chunk_end + 2 -- search new chunk past \0\n
   end
@@ -44,7 +51,7 @@ local function load_chunk(chunk_data)
   while part_start <= #chunk_data do
     if chunk_data:sub(part_start, part_start) ~= "\0" then return nil, "part entry not starting by \\0" end
     local key_char = chunk_data:sub(part_start + 1, part_start + 1)
-    if #key_char == 0 or not "12":find(key_char) then return nil, "part entry unknown" end
+    if #key_char == 0 or not ALLOWED_PARTS:find(key_char) then return nil, "part entry unknown" end
     local next_null = chunk_data:find("\0", part_start + 2)
     if next_null == nil then next_null = #chunk_data + 1 end -- consider the end of chunk_data as the end of that part
     chunk_table[key_char] = chunk_data:sub(part_start + 2, next_null - 1)
@@ -74,7 +81,7 @@ local function write_history(file_path, chunks)
   return true, nil
 end
 
-function append_to_history(history_file_path, added_to_history_file_path, current_directory, limit)
+function M.append_to_history(history_file_path, added_to_history_file_path, current_directory, limit)
   -- WARNING Saving a file creates a temporary file.tmp
   -- Removes duplicates as explained in the top comment
   -- Returns success, error_message
@@ -82,10 +89,11 @@ function append_to_history(history_file_path, added_to_history_file_path, curren
   if error_msg then return false, error_msg end
   local new_history = {}
   if current_directory:sub(-1) ~= "/" then current_directory = current_directory .. "/" end -- trailing slash
-  table.insert(new_history, {["1"] = added_to_history_file_path, ["2"] = current_directory})
+  table.insert(new_history, {[PART_FILEPATH] = added_to_history_file_path, [PART_CURRENT_DIR] = current_directory})
   for _, entry in ipairs(current_history) do
-    if entry["2"]:sub(-1) ~= "/" then entry["2"] = entry["2"] .. "/" end -- trailing slash
-    if entry["1"] ~= added_to_history_file_path or entry["2"]:sub(1, #current_directory) ~= current_directory then
+    if entry[PART_CURRENT_DIR]:sub(-1) ~= "/" then entry[PART_CURRENT_DIR] = entry[PART_CURRENT_DIR] .. "/" end
+    local entry_not_in_current_dir = entry[PART_CURRENT_DIR]:sub(1, #current_directory) ~= current_directory
+    if entry[PART_FILEPATH] ~= added_to_history_file_path or entry_not_in_current_dir then
       table.insert(new_history, entry)
     end
   end
@@ -96,3 +104,5 @@ function append_to_history(history_file_path, added_to_history_file_path, curren
   if not success or error_message then return false, error_message end
   return true, nil
 end
+
+return M
