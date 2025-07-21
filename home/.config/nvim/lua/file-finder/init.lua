@@ -4,11 +4,10 @@ local config = require("file-finder.config")
 local ui = require("file-finder.ui")
 local history = require("file-finder.history")
 
--- TODO when using history mode, if history doesn't fill the window, then show files in the dir as with O mode
 -- TODO when you add a file outside cd through the file explorer, it is still added to the current history
 -- TODO you can set cd from the file explorer
 -- TODO o should behave like previous plugin, C-o in the plugin should switch between 2 modes (o and O)
--- TODO ADAPT, merge what is needed
+-- TODO + and - to get more and less lines per file
 
 function M.setup()
   vim.keymap.set("n", "o",     ui.start_history_only, {desc = "Find files (history only)", silent = true})

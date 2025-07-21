@@ -7,7 +7,7 @@ local scoring = require("file-finder.scoring")
 local ceil = math.ceil
 
 -- TODO ctrl-o to switch with regular mode (merge it), ijkl to move with next versions
--- TODO would be nice if equivalent scores would get ranked by history
+-- TODO would be nice if equivalent scores would get ranked by history in file search mode
 local api = vim.api
 local fn = vim.fn
 
@@ -147,26 +147,18 @@ local function update_display(filtered_files)
       table.insert(display_items, item.file)
       table.insert(M.lines_infos, { file = item.file, colors = { { "FileFinderPathCd", 0, 9000 } } })
     else
-      local path_starter, full_path, selected_color = "/", item.file, "FileFinderPathRoot"
+      local infos = files.get_printable_file_infos(item.file)
+      local path_starter, short_path, selected_color = infos.path_starter, infos.short_path, infos.selected_color
       local line_number_as_str = tostring(i - 1)
       if i <  11 then line_number_as_str = " " .. line_number_as_str end
       if i < 101 then line_number_as_str = " " .. line_number_as_str end
-      if full_path:sub(1, #config.current_directory) == config.current_directory then
-        path_starter, selected_color = ".", "FileFinderPathCd"
-        full_path = full_path:sub(#config.current_directory + 1, #full_path)
-      elseif full_path:sub(1, #files.HOME) == files.HOME then
-        path_starter, selected_color = "~", "FileFinderPathHome"
-        full_path = full_path:sub(#files.HOME + 1, #full_path)
-      else
-        full_path = full_path:sub(2, #full_path)
-      end
       if i > 10 then selected_color = "FileFinderLineNumber" end
-      local reversed_slash_pos = full_path:reverse():find("/")
-      local slash_pos = reversed_slash_pos and #full_path - reversed_slash_pos + 1 or 0 -- 0 if not found
+      local reversed_slash_pos = short_path:reverse():find("/")
+      local slash_pos = reversed_slash_pos and #short_path - reversed_slash_pos + 1 or 0 -- 0 if not found
       table.insert(
-        display_items, line_number_as_str .. " " .. path_starter .. " " .. full_path .. " " .. tostring(i - 1)
+        display_items, line_number_as_str .. " " .. path_starter .. " " .. short_path .. " " .. tostring(i - 1)
       )
-      local colors = { { selected_color, 0, slash_pos + 6 }, { selected_color, #full_path + 6, 9000 } }
+      local colors = { { selected_color, 0, slash_pos + 6 }, { selected_color, #short_path + 6, 9000 } }
       table.insert(M.lines_infos, { file = item.file, colors = colors })
     end
     if item.matched_lines and #item.matched_lines > 0 and not M.history_only_mode then

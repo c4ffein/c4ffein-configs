@@ -1,6 +1,6 @@
 local M = {}
 
-local scoring = require("file-finder.scoring")
+local config = require("file-finder.config")
 
 M.HOME = vim.env.HOME or vim.env.USERPROFILE -- USERPROFILE for Windows
 if M.HOME:sub(-1) ~= "/" then M.HOME = M.HOME .. "/" end
@@ -11,18 +11,6 @@ local function is_ignored_dir(dirname, ignored_dirs)
 end
 
 local function is_symlink(path) local stat = vim.loop.fs_lstat(path); return stat and stat.type == 'link' end
-
--- TODO + and - to get more and less lines per file
--- TODO adapt
--- local function ensure_dir(path)
---     local ok, err = vim.loop.fs_stat(path)
---     if not ok then vim.fn.mkdir(path, "p") end
--- end
--- 
--- local function ensure_file(path)
---     local file = io.open(path, 'a')
---     if file then file:close() end
--- end
 
 function M.open_file(file_path, line_number)
   -- line number is optional
@@ -59,6 +47,22 @@ function M.get_files()
   local return_table = {}
   for _, file in ipairs(files) do table.insert(return_table, { file = file }) end
   return return_table
+end
+
+function M.get_printable_file_infos(file_path)
+  local path_starter, short_path, selected_color = "/", file_path, "FileFinderPathRoot"
+  if short_path:sub(1, #config.current_directory) == config.current_directory then
+    path_starter, selected_color = ".", "FileFinderPathCd"
+    short_path = short_path:sub(#config.current_directory + 1, #short_path)
+  elseif short_path:sub(1, #M.HOME) == M.HOME then
+    path_starter, selected_color = "~", "FileFinderPathHome"
+    short_path = short_path:sub(#M.HOME + 1, #short_path)
+  else
+    short_path = short_path:sub(2, #short_path)
+  end
+  return {
+    full_path = file_path, path_starter = path_starter, short_path = short_path, selected_color = selected_color
+  }
 end
 
 return M
