@@ -21,6 +21,7 @@ M.start = ui.start
 vim.api.nvim_create_autocmd({"VimEnter", "BufReadPost", "BufEnter"}, { -- BufEnter sometimes needed when switching
   callback = function()
     opened_file = vim.fn.expand("%:p")
+    if opened_file == "" then return end
     vim.fn.mkdir(config.data_path, "p")
     history.append_to_history(config.data_file, opened_file, config.current_directory, config.MAX_SAVED_FILES)
   end
