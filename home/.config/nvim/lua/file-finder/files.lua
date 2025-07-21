@@ -25,7 +25,7 @@ function M.get_files()
   local max_files = 10000
 
   local function scan_dir(path, relative_path)
-    if #files >= max_files then vim.notify("Too many files in tree", vim.log.levels.WARN); return end  -- TODO custom
+    if #files >= max_files then vim.notify("Too many files in tree", vim.log.levels.WARN); return end
     local items = vim.fn.readdir(path)
     if not items then return end
     for _, item in ipairs(items) do
@@ -39,7 +39,7 @@ function M.get_files()
         local file_path = relative_path == "" and item or relative_path .. "/" .. item
         if not is_symlink(item_path) then table.insert(files, file_path) end
       end
-      if #files >= max_files then vim.notify("Too many files in tree", vim.log.levels.WARN); break end  -- TODO custom
+      if #files >= max_files then vim.notify("Too many files in tree", vim.log.levels.WARN); break end
     end
   end
 
