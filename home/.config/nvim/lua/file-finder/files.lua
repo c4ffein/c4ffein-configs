@@ -56,7 +56,9 @@ function M.get_files()
   end
 
   scan_dir(".", "")
-  return files
+  local return_table = {}
+  for _, file in ipairs(files) do table.insert(return_table, { file = file }) end
+  return return_table
 end
 
 return M

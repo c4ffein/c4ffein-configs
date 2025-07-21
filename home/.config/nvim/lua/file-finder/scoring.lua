@@ -18,29 +18,32 @@ function M.score(pattern, str, skip_regex_matching)
   return                                         skip_regex_matching, 0, start_pos, end_pos
 end
 
-function M.filter(pattern, items, key_func)
+function M.filter(pattern, items, key_func, file_only_mode)
   -- TODO the state of pattern matching or no should be shown in the ui
   -- TODO handle this before, reuse history like with the o version?
+  -- TODO when working in file_only_mode, should only match on the part of the path that will get printed
+  --      => so that path computation should actually be done elsewhere
   if not pattern or pattern == "" then return items end
   local scored_items, skip_regex_matching = {}, false
   key_func = key_func or function(item) return item end
-  
   for _, item in ipairs(items) do
-    local key, item_score, current_score = key_func(item), 0, 0
-    skip_regex_matching, current_score, start_pos, end_pos = M.score(pattern, item, skip_regex_matching)
+    local file_path, key, item_score, current_score = item.file, key_func(item), 0, 0
+    skip_regex_matching, current_score, start_pos, end_pos = M.score(pattern, file_path, skip_regex_matching)
     item_score = current_score * 1000
     local matched_lines = {}
     local line_num = 0
-    for line in io.lines(item) do
-      line_num = line_num + 1
-      skip_regex_matching, current_score, start_pos, end_pos = M.score(pattern, line, skip_regex_matching)
-      item_score = item_score + current_score
-      if current_score > 0 and #matched_lines < 3 then
-        table.insert(matched_lines, {line_num = line_num, content = line, start_pos = start_pos, end_pos = end_pos})
+    if not file_only_mode then
+      for line in io.lines(file_path) do
+        line_num = line_num + 1
+        skip_regex_matching, current_score, start_pos, end_pos = M.score(pattern, line, skip_regex_matching)
+        item_score = item_score + current_score
+        if current_score > 0 and #matched_lines < 3 then
+          table.insert(matched_lines, {line_num = line_num, content = line, start_pos = start_pos, end_pos = end_pos})
+        end
       end
     end
     if item_score > 0 then
-      table.insert(scored_items, {item = item, score = item_score, key = key, matched_lines = matched_lines})
+      table.insert(scored_items, {file_path = file_path, score = item_score, key = key, matched_lines = matched_lines})
     end
   end
   
@@ -50,7 +53,7 @@ function M.filter(pattern, items, key_func)
   
   local result = {}
   for _, scored_item in ipairs(scored_items) do
-    table.insert(result, {file = scored_item.item, matched_lines = scored_item.matched_lines})
+    table.insert(result, {file = scored_item.file_path, matched_lines = scored_item.matched_lines})
   end
   return result
 end

@@ -141,51 +141,47 @@ local function update_display(filtered_files)
   M.lines_infos = {}
   for i = 1, math.min(#filtered_files, 50) do
     local item = filtered_files[i]
-    if type(item) == "table" then
-      -- TODO : ... after file name if more exemples?
-      if not M.history_only_mode then
-        table.insert(display_items, item.file)
-        table.insert(M.lines_infos, { file = item.file, colors = { { "FileFinderPathCd", 0, 9000 } } })
+    if type(item) ~= "table" then vim.notify("update_display consumed a non table", vim.log.levels.ERROR); return end
+    -- TODO : ... after file name if more exemples?
+    if not M.history_only_mode then
+      table.insert(display_items, item.file)
+      table.insert(M.lines_infos, { file = item.file, colors = { { "FileFinderPathCd", 0, 9000 } } })
+    else
+      local path_starter, full_path, selected_color = "/", item.file, "FileFinderPathRoot"
+      local line_number_as_str = tostring(i - 1)
+      if i <  11 then line_number_as_str = " " .. line_number_as_str end
+      if i < 101 then line_number_as_str = " " .. line_number_as_str end
+      if full_path:sub(1, #config.current_directory) == config.current_directory then
+        path_starter, selected_color = ".", "FileFinderPathCd"
+        full_path = full_path:sub(#config.current_directory + 1, #full_path)
+      elseif full_path:sub(1, #files.HOME) == files.HOME then
+        path_starter, selected_color = "~", "FileFinderPathHome"
+        full_path = full_path:sub(#files.HOME + 1, #full_path)
       else
-        local path_starter, full_path, selected_color = "/", item.file, "FileFinderPathRoot"
-        local line_number_as_str = tostring(i - 1)
-        if i <  11 then line_number_as_str = " " .. line_number_as_str end
-        if i < 101 then line_number_as_str = " " .. line_number_as_str end
-        if full_path:sub(1, #config.current_directory) == config.current_directory then
-          path_starter, selected_color = ".", "FileFinderPathCd"
-          full_path = full_path:sub(#config.current_directory + 1, #full_path)
-        elseif full_path:sub(1, #files.HOME) == files.HOME then
-          path_starter, selected_color = "~", "FileFinderPathHome"
-          full_path = full_path:sub(#files.HOME + 1, #full_path)
-        else
-          full_path = full_path:sub(2, #full_path)
-        end
-        if i > 10 then selected_color = "FileFinderLineNumber" end
-        local reversed_slash_pos = full_path:reverse():find("/")
-        local slash_pos = reversed_slash_pos and #full_path - reversed_slash_pos + 1 or 0 -- 0 if not found
-        table.insert(
-          display_items, line_number_as_str .. " " .. path_starter .. " " .. full_path .. " " .. tostring(i - 1)
-        )
-        local colors = { { selected_color, 0, slash_pos + 6 }, { selected_color, #full_path + 6, 9000 } }
-        table.insert(M.lines_infos, { file = item.file, colors = colors })
+        full_path = full_path:sub(2, #full_path)
       end
-      if item.matched_lines and #item.matched_lines > 0 and not M.history_only_mode then
-        for j, match in ipairs(item.matched_lines) do
-          local line_number = string.rep(' ', math.max(0, 5 - #tostring(match.line_num))) .. match.line_num
-          local content = match.content:gsub("^%s+", "")
-          local color_offset = #content - #match.content + #line_number
-          table.insert(display_items, line_number .. ' ' .. content)
-          table.insert(M.lines_infos, {
-            file = item.file,
-            colors = { { "FileFinderLineNumber", 0,                              #line_number                     },
-                       { "FileFinderLineMatch",  color_offset + match.start_pos, color_offset + match.end_pos + 1 } },
-            line_number = match.line_num
-          } )
-        end
+      if i > 10 then selected_color = "FileFinderLineNumber" end
+      local reversed_slash_pos = full_path:reverse():find("/")
+      local slash_pos = reversed_slash_pos and #full_path - reversed_slash_pos + 1 or 0 -- 0 if not found
+      table.insert(
+        display_items, line_number_as_str .. " " .. path_starter .. " " .. full_path .. " " .. tostring(i - 1)
+      )
+      local colors = { { selected_color, 0, slash_pos + 6 }, { selected_color, #full_path + 6, 9000 } }
+      table.insert(M.lines_infos, { file = item.file, colors = colors })
+    end
+    if item.matched_lines and #item.matched_lines > 0 and not M.history_only_mode then
+      for j, match in ipairs(item.matched_lines) do
+        local line_number = string.rep(' ', math.max(0, 5 - #tostring(match.line_num))) .. match.line_num
+        local content = match.content:gsub("^%s+", "")
+        local color_offset = #content - #match.content + #line_number
+        table.insert(display_items, line_number .. ' ' .. content)
+        table.insert(M.lines_infos, {
+          file = item.file,
+          colors = { { "FileFinderLineNumber", 0,                              #line_number                     },
+                     { "FileFinderLineMatch",  color_offset + match.start_pos, color_offset + match.end_pos + 1 } },
+          line_number = match.line_num
+        } )
       end
-    else  -- TODO refactor the first file list so this case is useless
-      table.insert(display_items, item)
-      table.insert(M.lines_infos, { file = item, colors = {} })
     end
   end
   M.update_results(M.buf, display_items, selected_line, M.lines_infos)
@@ -212,7 +208,7 @@ function M.start(history_only_mode)
     
     if new_pattern ~= pattern then
       pattern = new_pattern
-      filtered_files = scoring.filter(pattern, all_files_from_tree)
+      filtered_files = scoring.filter(pattern, obtained_files, nil, M.history_only_mode)
       selected_line = 1
       update_display(filtered_files)
     end
@@ -250,7 +246,6 @@ function M.start(history_only_mode)
     sk(M.buf,        "i", tostring(i), "", { callback = key_callback,                noremap = true, silent = true })
   end
 
-  if pattern and #pattern > 0 then filtered_files = scoring.filter(pattern, files) end
   update_display(filtered_files)
   vim.api.nvim_buf_set_lines(M.prompt_buf, 0, 1, false, { "> " .. visual_selection })  -- triggers recomputation
   vim.cmd("startinsert")
