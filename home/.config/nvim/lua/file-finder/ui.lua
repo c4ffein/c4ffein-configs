@@ -162,7 +162,7 @@ local function update_display(filtered_files)
         end
         if i > 10 then selected_color = "FileFinderLineNumber" end
         local reversed_slash_pos = full_path:reverse():find("/")
-        local slash_pos = reversed_slash_pos and #full_path - reversed_slash_pos + 1 or 1 -- 1 if not found
+        local slash_pos = reversed_slash_pos and #full_path - reversed_slash_pos + 1 or 0 -- 0 if not found
         table.insert(
           display_items, line_number_as_str .. " " .. path_starter .. " " .. full_path .. " " .. tostring(i - 1)
         )
@@ -234,7 +234,7 @@ function M.start(history_only_mode)
   end
 
   vim.api.nvim_buf_attach(M.prompt_buf, false, { on_lines = function() vim.schedule(on_input_change) end })
- 
+
   local sk = vim.api.nvim_buf_set_keymap
   sk(M.prompt_buf, "i", "<CR>",  "", { callback = select_file,                       noremap = true, silent = true })
   sk(M.prompt_buf, "i", "<C-k>", "", { callback = function() move_selection(1) end,  noremap = true, silent = true })
@@ -243,6 +243,13 @@ function M.start(history_only_mode)
   sk(M.buf,        "n", "<CR>",  "", { callback = select_file,                       noremap = true, silent = true })
   sk(M.buf,        "n", "q",     "", { callback = M.close_windows,                   noremap = true, silent = true })
   sk(M.buf,        "n", "<Esc>", "", { callback = M.close_windows,                   noremap = true, silent = true })
+  for i = 0, 9 do
+    local local_i = i
+    key_callback = function() selected_line = local_i + 1; select_file() end
+    sk(M.prompt_buf, "i", tostring(i), "", { callback = key_callback,                noremap = true, silent = true })
+    sk(M.buf,        "i", tostring(i), "", { callback = key_callback,                noremap = true, silent = true })
+  end
+
   if pattern and #pattern > 0 then filtered_files = scoring.filter(pattern, files) end
   update_display(filtered_files)
   vim.api.nvim_buf_set_lines(M.prompt_buf, 0, 1, false, { "> " .. visual_selection })  -- triggers recomputation
