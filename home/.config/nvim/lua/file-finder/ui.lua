@@ -185,27 +185,37 @@ function M.start(history_only_mode)
 
   local all_files_from_tree = files.get_files()
   local all_files_from_history = history.load_history_for_ui()
-  local obtained_files = M.history_only_mode and all_files_from_history or all_files_from_tree
+  local obtained_files, filtered_files, selected_line, pattern = {}, {}, 1, ""
 
   M.setup_highlights()
   M.show_windows()
 
-  local filtered_files = obtained_files
-  local selected_line = 1
-  local pattern = ""
+  local function set_obtained_files()
+    obtained_files = M.history_only_mode and all_files_from_history or all_files_from_tree
+  end
 
-  local function on_input_change()
+  set_obtained_files()
+  filtered_files = obtained_files
+
+  local function on_input_change(force)
     local lines = vim.api.nvim_buf_get_lines(M.prompt_buf, 0, -1, false)
     local new_pattern = lines[1] and lines[1]:gsub("^> ", "") or ""
     
-    if new_pattern ~= pattern then
+    if new_pattern ~= pattern or force then
       pattern = new_pattern
       filtered_files = scoring.filter(pattern, obtained_files, nil, M.history_only_mode)
       selected_line = 1
       update_display(filtered_files)
     end
   end
-  
+
+  local function switch_mode()
+    M.history_only_mode = not M.history_only_mode
+    set_obtained_files()
+    M.set_windows_characterisitcs()
+    on_input_change(true)
+  end
+
   local function select_file()
     local line_infos = M.lines_infos[selected_line]
     M.close_windows()
@@ -225,10 +235,12 @@ function M.start(history_only_mode)
 
   local sk = vim.api.nvim_buf_set_keymap
   sk(M.prompt_buf, "i", "<CR>",  "", { callback = select_file,                       noremap = true, silent = true })
+  sk(M.prompt_buf, "i", "<C-o>", "", { callback = switch_mode,                       noremap = true, silent = true })
   sk(M.prompt_buf, "i", "<C-k>", "", { callback = function() move_selection(1) end,  noremap = true, silent = true })
   sk(M.prompt_buf, "i", "<C-^>", "", { callback = function() move_selection(-1) end, noremap = true, silent = true })
   sk(M.prompt_buf, "i", "<Esc>", "", { callback = M.close_windows,                   noremap = true, silent = true })
   sk(M.buf,        "n", "<CR>",  "", { callback = select_file,                       noremap = true, silent = true })
+  sk(M.buf,        "n", "<C-o>", "", { callback = switch_mode,                       noremap = true, silent = true })
   sk(M.buf,        "n", "q",     "", { callback = M.close_windows,                   noremap = true, silent = true })
   sk(M.buf,        "n", "<Esc>", "", { callback = M.close_windows,                   noremap = true, silent = true })
   for i = 0, 9 do
@@ -237,7 +249,6 @@ function M.start(history_only_mode)
     sk(M.prompt_buf, "i", tostring(i), "", { callback = key_callback,                noremap = true, silent = true })
     sk(M.buf,        "i", tostring(i), "", { callback = key_callback,                noremap = true, silent = true })
   end
-
   update_display(filtered_files)
   vim.api.nvim_buf_set_lines(M.prompt_buf, 0, 1, false, { "> " .. visual_selection })  -- triggers recomputation
   vim.cmd("startinsert")
