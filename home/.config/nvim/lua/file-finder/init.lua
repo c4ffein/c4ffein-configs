@@ -6,7 +6,6 @@ local history = require("file-finder.history")
 
 -- TODO when you add a file outside cd through the file explorer, it is still added to the current history
 -- TODO you can set cd from the file explorer
--- TODO o should behave like previous plugin, C-o in the plugin should switch between 2 modes (o and O)
 -- TODO + and - to get more and less lines per file
 
 function M.setup()

@@ -6,7 +6,6 @@ local history = require("file-finder.history")
 local scoring = require("file-finder.scoring")
 local ceil = math.ceil
 
--- TODO ctrl-o to switch with regular mode (merge it), ijkl to move with next versions
 -- TODO would be nice if equivalent scores would get ranked by history in file search mode
 local api = vim.api
 local fn = vim.fn
@@ -18,41 +17,45 @@ M.main_height,  M.prompt_win_height,  M.backdrop_win_height  =  20,  20,  20
 M.main_width,   M.prompt_win_width,   M.backdrop_win_width   =  20,  20,  20
 M.main_row,     M.prompt_row,         M.backdrop_row         =   0,   0,   0
 M.main_col,     M.prompt_col,         M.backdrop_col         =   0,   0,   0
-M.main_blend,   M.prompt_blend,       M.backdrop_blend       = 100, 100, 100
+M.main_blend,   M.prompt_blend,       M.backdrop_blend       =   0,   0,   0
 M.lines_infos = {}
 
 function M.set_windows_characterisitcs()
   if M.history_only_mode then
     M.main_width, M.main_height     = 100, 22
     M.main_row,   M.main_col        = ceil((vim.o.lines - M.main_height)) / 2, ceil((vim.o.columns - M.main_width) / 2)
-    M.main_blend, M.backdrop_blend  = 5, 100
+    M.main_blend, M.prompt_blend, M.backdrop_blend = 5, 5, 100
   else
     M.main_width, M.main_height     = vim.o.columns - 22, vim.o.lines - 9
     M.main_row,   M.main_col        = 6, 10
-    M.main_blend, M.backdrop_blend  = 0, 15
+    M.main_blend, M.prompt_blend, M.backdrop_blend  = 0, 0, 15
   end
   M.prompt_width,   M.prompt_height   = M.main_width, 1
   M.prompt_row,     M.prompt_col      = M.main_row - 4, M.main_col
   M.backdrop_width, M.backdrop_height = vim.o.columns, vim.o.lines
 end
 
+local function make_win_opts(height, width, row, col, additional_opts)
+  local returned_table = {
+    relative = "editor", height = height, width = width, row = row, col = col, style = "minimal"
+  }
+  for k, v in pairs(additional_opts) do returned_table[k] = v end
+  return returned_table
+end
+
 function M.create_backdrop_window()
   local backdrop_buf = api.nvim_create_buf(false, true)
-  local backdrop_opts = {
-    relative = "editor", width = M.backdrop_width, height = M.backdrop_height, row = M.backdrop_row, col = M.backdrop_col,
-    style = "minimal", focusable = false, zindex = 1,
-  }
-  local backdrop_win = api.nvim_open_win(backdrop_buf, false, backdrop_opts)
-  api.nvim_win_set_option(backdrop_win, "winblend", M.backdrop_blend)
-  return backdrop_buf, backdrop_win
+  local height, width, row, col = M.backdrop_height, M.backdrop_width, M.backdrop_row, M.backdrop_col
+  local win_opts = make_win_opts(height, width, row, col, { focusable = false, zindex = 1 })
+  local win = api.nvim_open_win(backdrop_buf, false, win_opts)
+  api.nvim_win_set_option(win, "winblend", M.backdrop_blend)
+  return backdrop_buf, win
 end
 
 function M.create_floating_window()
   local buf = api.nvim_create_buf(false, true)
-  local win_opts = {
-    relative = "editor", width = M.main_width, height = M.main_height, row = M.main_row, col = M.main_col, zindex = 2,
-    style = "minimal", border = "single",
-  }
+  local height, width, row, col = M.main_height, M.main_width, M.main_row, M.main_col
+  local win_opts = make_win_opts(height, width, row, col, { zindex = 2, border = "single" })
   local win = api.nvim_open_win(buf, true, win_opts)
   api.nvim_win_set_option(win, "wrap", false)
   api.nvim_win_set_option(win, "cursorline", true)
@@ -60,19 +63,25 @@ function M.create_floating_window()
   return buf, win
 end
 
-function M.create_prompt_window(main_win, first_pattern)
-  local main_config = api.nvim_win_get_config(main_win)
-  local width = main_config.width
+function M.create_prompt_window()
   local prompt_buf = api.nvim_create_buf(false, true)
-  local prompt_opts = {
-    relative = "editor", width = width, height = 1, row = M.prompt_row, col = M.prompt_col,
-    style = "minimal", border = "single"
-  }
-  local prompt_win = api.nvim_open_win(prompt_buf, true, prompt_opts)
+  local height, width, row, col = M.prompt_height, M.prompt_width, M.prompt_row, M.prompt_col
+  local win_opts = make_win_opts(height, width, row, col, { border = "single" })
+  local prompt_win = api.nvim_open_win(prompt_buf, true, win_opts)
   api.nvim_buf_set_option(prompt_buf, "buftype", "prompt")
   api.nvim_buf_set_option(prompt_buf, "swapfile", false)
   fn.prompt_setprompt(prompt_buf, "> ")
   return prompt_buf, prompt_win
+end
+
+function M.reset_windows()
+  local function reset(win, height, width, row, col, blend)
+    api.nvim_win_set_config(win, { relative = "editor", height = height, width = width, row = row, col = col })
+    api.nvim_win_set_option(win, "winblend", blend)
+  end
+  reset(M.backdrop_win, M.backdrop_height, M.backdrop_width, M.backdrop_row, M.backdrop_col, M.backdrop_blend)
+  reset(M.main_win,     M.main_height,     M.main_width,     M.main_row,     M.main_col,     M.main_blend    )
+  reset(M.prompt_win,   M.prompt_height,   M.prompt_width,   M.prompt_row,   M.prompt_col,   M.prompt_blend  )
 end
 
 -- TODO ADAPT
@@ -104,22 +113,24 @@ function M.update_results(buf, items, selected_line)
 end
 
 function M.show_windows()
-  if M.prompt_win or M.win or M.backdrop_win or M.prompt_buf or M.buf or M.backdrop_buf then M.close_windows() end
+  if M.prompt_win or M.main_win or M.backdrop_win or M.prompt_buf or M.main_buf or M.backdrop_buf then
+    M.close_windows()
+  end
   M.set_windows_characterisitcs()
   M.backdrop_buf, M.backdrop_win = M.create_backdrop_window()
-  M.buf,          M.win          = M.create_floating_window()
-  M.prompt_buf,   M.prompt_win   = M.create_prompt_window(M.win)
+  M.main_buf,     M.main_win     = M.create_floating_window()
+  M.prompt_buf,   M.prompt_win   = M.create_prompt_window()
 end
 
 function M.close_windows()
   local forced = { force = true }
   if M.prompt_win   and api.nvim_win_is_valid(M.prompt_win)   then api.nvim_win_close( M.prompt_win,   true)   end
-  if M.win          and api.nvim_win_is_valid(M.win)          then api.nvim_win_close( M.win,          true)   end
+  if M.main_win     and api.nvim_win_is_valid(M.main_win)     then api.nvim_win_close( M.main_win,     true)   end
   if M.backdrop_win and api.nvim_win_is_valid(M.backdrop_win) then api.nvim_win_close( M.backdrop_win, true)   end
   if M.prompt_buf   and api.nvim_buf_is_valid(M.prompt_buf)   then api.nvim_buf_delete(M.prompt_buf,   forced) end
-  if M.buf          and api.nvim_buf_is_valid(M.buf)          then api.nvim_buf_delete(M.buf,          forced) end
+  if M.main_buf     and api.nvim_buf_is_valid(M.main_buf)     then api.nvim_buf_delete(M.main_buf,     forced) end
   if M.backdrop_buf and api.nvim_buf_is_valid(M.backdrop_buf) then api.nvim_buf_delete(M.backdrop_buf, forced) end
-  M.buf = nil; M.win = nil; M.prompt_buf = nil; M.prompt_win = nil; M.backdrop_buf = nil; M.backdrop_win = nil
+  M.main_buf = nil; M.main_win = nil; M.prompt_buf = nil; M.prompt_win = nil; M.backdrop_buf = nil; M.backdrop_win = nil
 end
 
 local function get_visual_selection()
@@ -176,7 +187,7 @@ local function update_display(filtered_files)
       end
     end
   end
-  M.update_results(M.buf, display_items, selected_line, M.lines_infos)
+  M.update_results(M.main_buf, display_items, selected_line, M.lines_infos)
 end
 
 function M.start(history_only_mode)
@@ -211,6 +222,8 @@ function M.start(history_only_mode)
 
   local function switch_mode()
     M.history_only_mode = not M.history_only_mode
+    M.set_windows_characterisitcs()
+    M.reset_windows()
     set_obtained_files()
     M.set_windows_characterisitcs()
     on_input_change(true)
@@ -228,7 +241,7 @@ function M.start(history_only_mode)
     local max_line = math.min(math.min(display_line_count - 1, 49), #M.lines_infos)
     selected_line = math.max(1, math.min(max_line + 1, selected_line + direction))
     update_display(filtered_files)
-    vim.api.nvim_win_set_cursor(M.win, {selected_line, 0})
+    vim.api.nvim_win_set_cursor(M.main_win, {selected_line, 0})
   end
 
   vim.api.nvim_buf_attach(M.prompt_buf, false, { on_lines = function() vim.schedule(on_input_change) end })
@@ -239,15 +252,15 @@ function M.start(history_only_mode)
   sk(M.prompt_buf, "i", "<C-k>", "", { callback = function() move_selection(1) end,  noremap = true, silent = true })
   sk(M.prompt_buf, "i", "<C-^>", "", { callback = function() move_selection(-1) end, noremap = true, silent = true })
   sk(M.prompt_buf, "i", "<Esc>", "", { callback = M.close_windows,                   noremap = true, silent = true })
-  sk(M.buf,        "n", "<CR>",  "", { callback = select_file,                       noremap = true, silent = true })
-  sk(M.buf,        "n", "<C-o>", "", { callback = switch_mode,                       noremap = true, silent = true })
-  sk(M.buf,        "n", "q",     "", { callback = M.close_windows,                   noremap = true, silent = true })
-  sk(M.buf,        "n", "<Esc>", "", { callback = M.close_windows,                   noremap = true, silent = true })
+  sk(M.main_buf,   "n", "<CR>",  "", { callback = select_file,                       noremap = true, silent = true })
+  sk(M.main_buf,   "n", "<C-o>", "", { callback = switch_mode,                       noremap = true, silent = true })
+  sk(M.main_buf,   "n", "q",     "", { callback = M.close_windows,                   noremap = true, silent = true })
+  sk(M.main_buf,   "n", "<Esc>", "", { callback = M.close_windows,                   noremap = true, silent = true })
   for i = 0, 9 do
     local local_i = i
     key_callback = function() selected_line = local_i + 1; select_file() end
     sk(M.prompt_buf, "i", tostring(i), "", { callback = key_callback,                noremap = true, silent = true })
-    sk(M.buf,        "i", tostring(i), "", { callback = key_callback,                noremap = true, silent = true })
+    sk(M.main_buf,   "i", tostring(i), "", { callback = key_callback,                noremap = true, silent = true })
   end
   update_display(filtered_files)
   vim.api.nvim_buf_set_lines(M.prompt_buf, 0, 1, false, { "> " .. visual_selection })  -- triggers recomputation
