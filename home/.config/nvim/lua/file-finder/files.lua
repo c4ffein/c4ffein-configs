@@ -21,7 +21,7 @@ end
 function M.get_files()
   -- doesn't follow symlinks - could add all targets to (links to check / results) if they don't exist, keeping naive rn
   local files = {}
-  local ignored_dirs = { ".git", "node_modules", ".nvim", ".venv", "__pycache__", ".ruff_cache", "package-lock.json" }
+  local ignored_dirs = { ".git", "node_modules", ".nvim", ".venv", "__pycache__", ".ruff_cache", "package-lock.json", ".gen" }
   local max_files = 10000
 
   local function scan_dir(path, relative_path)
