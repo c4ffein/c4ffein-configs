@@ -81,6 +81,5 @@ vim.keymap.set('n', '<C-v>', select_current_word, { desc = 'select word' })
 -- TODO reimplement in lua with features like ijkl
 vim.keymap.set('n', '<C-o>', ':Explore<CR>', { desc = 'open file explorer' })
 
--- TODO m 1/2/3 like o but for makefile
-
 require('file-finder').setup()
+require('make-runner').setup()
