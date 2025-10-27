@@ -27,6 +27,8 @@ local state = {
   selected_idx = 1,
   search_query = "",
   history = {}, -- { target_name = timestamp } -- we can allow ourselves to stay KISS and have a common list to all
+  makefile_dir = nil, -- Directory containing the Makefile (for make -C)
+  job_id = nil, -- Job ID of running make process (for proper cleanup)
 }
 
 -- Validate target name (security: only allow safe characters)
@@ -273,8 +275,43 @@ local function update_prompt()
   -- The prompt buffer automatically shows "> " + typed text
 end
 
+-- Kill process tree recursively (nuclear option for stubborn background jobs)
+local function kill_process_tree(pid)
+  if not pid or pid <= 0 then return end
+  local pid_str = tostring(pid)
+  -- PARANOID: Validate PID is digits only
+  if not pid_str:match("^%d+$") then return end
+  -- Find all children recursively using pgrep
+  -- Use list form for safety
+  local result = vim.fn.system({'pgrep', '-P', pid_str})
+  local children = vim.split(result, '\n', {trimempty = true})
+  -- Recursively kill all children first
+  for _, child_pid_str in ipairs(children) do
+    -- Paranoid validation of each child PID
+    if child_pid_str:match("^%d+$") then
+      kill_process_tree(tonumber(child_pid_str))
+    end
+  end
+  -- Then kill the parent with SIGKILL
+  vim.fn.system({'kill', '-KILL', pid_str})
+end
+
 -- Close output modal
 local function close_output_modal()
+  -- Kill the running job and ALL its descendants (prevents orphaned processes)
+  if state.job_id then
+    -- Use pcall to handle case where job already finished
+    local ok, pid = pcall(vim.fn.jobpid, state.job_id)
+    if ok and pid > 0 then
+      -- Job is still running, kill it
+      -- First try polite termination
+      vim.fn.jobstop(state.job_id)
+      -- Then nuclear option: recursively kill entire process tree
+      kill_process_tree(pid)
+    end
+    -- Job already finished or was killed, just clean up
+    state.job_id = nil
+  end
   if state.win_output and vim.api.nvim_win_is_valid(state.win_output) then
     vim.api.nvim_win_close(state.win_output, true)
   end
@@ -289,6 +326,11 @@ end
 -- Run make target in modal
 local function run_target(target_name)
   -- TODO SECURE OUTPUT IN MODAL
+  -- Security: Double-check makefile_dir before using it
+  if not state.makefile_dir or not is_valid_path(state.makefile_dir) then
+    print("Invalid Makefile directory")
+    return
+  end
   -- Update history
   update_history(target_name)
   -- Close target selector UI (keep backdrop)
@@ -331,8 +373,11 @@ local function run_target(target_name)
   vim.api.nvim_create_autocmd('WinLeave', { buffer = state.buf_output, once = true, callback = close_output_modal })
   -- Run make in terminal mode inside the buffer
   -- Use list form to prevent shell interpretation (security)
-  vim.fn.termopen({'make', target_name})
-  -- Start in insert mode to see output
+  -- Use -C to run from the Makefile's directory
+  -- Store job_id for proper cleanup (kills all child processes on close)
+  state.job_id = vim.fn.termopen({'make', '-C', state.makefile_dir, target_name})
+  -- Move cursor to end for auto-scroll, then enter terminal mode
+  vim.cmd("normal! G")
   vim.cmd("startinsert")
 end
 
@@ -502,6 +547,13 @@ function M.open()
   local makefile = find_makefile()
   if not makefile then
     print("No Makefile found")
+    return
+  end
+  -- Store the directory containing the Makefile for make -C
+  state.makefile_dir = vim.fn.fnamemodify(makefile, ":h")
+  -- Security: Paranoid validation of the directory path
+  if not is_valid_path(state.makefile_dir) then
+    print("Invalid Makefile directory path")
     return
   end
   state.targets = parse_makefile(makefile)
