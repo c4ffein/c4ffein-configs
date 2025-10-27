@@ -167,7 +167,6 @@ local function parse_makefile(filepath)
   local targets = {}
   local file = io.open(filepath, "r")
   if not file then return targets end
-
   for line in file:lines() do
     -- Match: "target: ## Description"
     -- Security: Validate BOTH target AND description (no escape sequences, control chars)
@@ -188,7 +187,6 @@ local function parse_makefile(filepath)
       end
     end
   end
-
   file:close()
   return targets
 end
