@@ -364,13 +364,33 @@ local function run_target(target_name)
   -- Set buffer options
   vim.api.nvim_buf_set_option(state.buf_output, "bufhidden", "wipe")
   vim.api.nvim_buf_set_option(state.buf_output, "buftype", "nofile")
-  -- Set window options for black background
+  -- Set window options and hide cursor
   vim.api.nvim_win_set_option(state.win_output, "winhl", "Normal:Normal")
+  -- Hide cursor by making it fully transparent (blend with background)
+  vim.cmd("highlight TermCursor blend=100")
+  vim.cmd("highlight TermCursorNC blend=100")
   -- Set up keybinds to close
   vim.keymap.set('n', 'q', close_output_modal, { buffer = state.buf_output, noremap = true, silent = true })
   vim.keymap.set('n', '<Esc>', close_output_modal, { buffer = state.buf_output, noremap = true, silent = true })
   -- Auto-close on focus lost
   vim.api.nvim_create_autocmd('WinLeave', { buffer = state.buf_output, once = true, callback = close_output_modal })
+  -- Hide cursor for cleaner UX while output is streaming
+  local saved_guicursor = vim.o.guicursor
+  vim.api.nvim_create_autocmd('TermOpen', {
+    buffer = state.buf_output,
+    once = true,
+    callback = function()
+      vim.opt_local.guicursor = 'a:hor1-Cursor/lCursor'  -- Thin horizontal line (nearly invisible)
+    end
+  })
+  -- Restore cursor when leaving
+  vim.api.nvim_create_autocmd('BufLeave', {
+    buffer = state.buf_output,
+    once = true,
+    callback = function()
+      vim.o.guicursor = saved_guicursor
+    end
+  })
   -- Run make in terminal mode inside the buffer
   -- Use list form to prevent shell interpretation (security)
   -- Use -C to run from the Makefile's directory
