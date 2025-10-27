@@ -1,8 +1,36 @@
 -- Make Target Runner
 -- Press 'm' to show Makefile targets, press number to run instantly
 --
--- Security: Target names restricted to [a-zA-Z0-9._-] to prevent shell injection
--- Commands executed via list form of termopen (no shell interpretation)
+-- ============================================================================
+-- SECURITY MODEL
+-- ============================================================================
+--
+-- INVOCATION SECURITY (PARANOID):
+-- - Target names: Restricted to [a-zA-Z0-9._-] via char-by-char validation
+-- - Descriptions: ASCII printable only, no control chars/escape sequences
+-- - Paths: ASCII-only to prevent path manipulation attacks
+-- - History: Validated target names and timestamps
+-- - Temp files: Validated naming to prevent path traversal
+-- - Execution: Commands use list form of termopen (no shell interpretation)
+--
+-- OUTPUT SECURITY (UNFILTERED):
+-- - Terminal output from make commands is NOT sanitized
+-- - ANSI escape sequences (colors, cursor control, OSC 52, etc.) pass through
+-- - Attack surface: Same as running make in any terminal
+-- - Potential risks: Clipboard hijacking (OSC 52), display manipulation
+-- - Tradeoff: Preserving colored output and terminal features vs filtering
+-- - Decision: Accept risk - attack surface minimal, consequences limited
+-- - Rationale: If attacker controls command output, they already control
+--   the commands being run (Makefile content), making output filtering
+--   security theater. Use this tool only with trusted Makefiles.
+--   The only difference would be if an attacker controlled part of the output
+--   -> without actual control of the code, i.e. remote data somewhere.
+--
+-- COULD WE SANITIZE? Yes, by stripping all ANSI escape sequences from output.
+-- WHY DON'T WE? Because it provides minimal security benefit while breaking
+-- useful features (colors, progress bars, etc.) in legitimate use cases.
+-- We could also implement a smart filter, but it's currently not worth it.
+-- ============================================================================
 
 local M = {}
 
@@ -323,7 +351,6 @@ end
 
 -- Run make target in modal
 local function run_target(target_name)
-  -- TODO SECURE OUTPUT IN MODAL
   -- Security: Double-check makefile_dir before using it
   if not state.makefile_dir or not is_valid_path(state.makefile_dir) then
     print("Invalid Makefile directory")
@@ -407,7 +434,8 @@ local function on_prompt_input()
   local lines = vim.api.nvim_buf_get_lines(state.buf_prompt, 0, -1, false)
   if #lines > 0 then state.search_query = lines[1]:gsub("^> ", "") else state.search_query = "" end
   filter_targets()
-  render()
+  -- Use vim.schedule to defer render (autocmd callbacks have restrictions)
+  vim.schedule(render)
 end
 
 -- Handle key press in main window
@@ -503,7 +531,8 @@ local function create_ui()
       local line = pos.line
       if line > 0 and line <= #state.filtered_targets then
         state.selected_idx = line
-        render()
+        -- Use vim.schedule to defer render (expr mappings can't modify buffers directly)
+        vim.schedule(render)
       end
     end
     return ""  -- Return empty string to prevent default mouse behavior
@@ -517,11 +546,13 @@ local function create_ui()
   -- Navigation from insert mode
   vim.keymap.set('i', '<C-k>', function()
     state.selected_idx = math.min(state.selected_idx + 1, #state.filtered_targets)
-    render()
+    -- Use vim.schedule to defer render (insert mode can't modify buffers directly)
+    vim.schedule(render)
   end, prompt_opts)
   vim.keymap.set('i', '<C-^>', function()
     state.selected_idx = math.max(state.selected_idx - 1, 1)
-    render()
+    -- Use vim.schedule to defer render (insert mode can't modify buffers directly)
+    vim.schedule(render)
   end, prompt_opts)
   -- Number shortcuts in prompt (insert mode - execute, don't type)
   -- 0 closes, 1-9 execute targets
