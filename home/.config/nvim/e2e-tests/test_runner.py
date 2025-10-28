@@ -4,7 +4,9 @@ E2E test runner for Neovim config
 Pure Python stdlib - uses pty to drive real nvim instance
 
 Usage:
-  python3 e2e-tests/test_runner.py               # Run all tests
+  python3 e2e-tests/test_runner.py                    # Run all tests
+  python3 e2e-tests/test_runner.py TestMakeRunner     # Run specific test class
+  python3 e2e-tests/test_runner.py TestMakeRunner.test_filter_targets  # Run specific test
   DEBUG_NVIM_SCREEN=1 python3 e2e-tests/test_runner.py  # Debug mode (show screen output)
 """
 
@@ -14,6 +16,7 @@ import select
 import subprocess
 import tempfile
 import time
+import unittest
 from pathlib import Path
 
 
@@ -231,6 +234,7 @@ class NvimTerminal:
         # Debug output if env var is set
         if os.environ.get('DEBUG_NVIM_SCREEN'):
             print(f"\n=== SCREEN OUTPUT (accumulated buffer) ===\n{text[-500:]}\n===================\n", flush=True)
+
         return text
 
     def assert_visible(self, text):
@@ -261,11 +265,13 @@ class NvimTerminal:
         self.close()
 
 
-class TestMakeRunner:
+class TestMakeRunner(unittest.TestCase):
     """E2E tests for make-runner"""
 
-    def __init__(self, config_dir):
-        self.config_dir = config_dir
+    @classmethod
+    def setUpClass(cls):
+        """Set up test class with config directory"""
+        cls.config_dir = Path.home() / '.config/nvim'
 
     def test_open_make_runner(self):
         """Test opening make-runner with 'm'"""
@@ -290,7 +296,7 @@ class TestMakeRunner:
                 assert 'test' in grid, f"Expected 'test' in grid"
                 assert 'build' in grid, f"Expected 'build' in grid"
                 assert 'Run tests' in grid, f"Expected 'Run tests' in grid"
-                print("✓ test_open_make_runner passed")
+
 
     def test_filter_targets(self):
         """Test filtering targets by typing"""
@@ -306,7 +312,6 @@ class TestMakeRunner:
                 "deploy: ## Deploy\n"
                 "\techo \"deploying\"\n"
             )
-
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
                 # Press 'm' to open make-runner
@@ -326,14 +331,12 @@ class TestMakeRunner:
                 # build and deploy should NOT appear in filtered view
                 assert 'build' not in grid, f"Should not see 'build' after filtering by 'te'"
                 assert 'deploy' not in grid, f"Should not see 'deploy' after filtering by 'te'"
-                print("✓ test_filter_targets passed")
 
     def test_close_with_zero(self):
         """Test closing make-runner with '0'"""
         with tempfile.TemporaryDirectory() as tmpdir:
             makefile = Path(tmpdir) / 'Makefile'
             makefile.write_text('test: ## Test\n\techo test\n')
-
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
                 nvim.send_keys('m')
@@ -349,7 +352,6 @@ class TestMakeRunner:
                 # Floating window border characters or target names shouldn't be visible
                 assert 'Test' not in grid and 'test' not in grid.lower(), \
                     f"UI should be closed.\nGrid:\n{grid}"
-                print("✓ test_close_with_zero passed")
 
     def test_close_with_escape(self):
         """Test closing make-runner with ESC"""
@@ -369,7 +371,6 @@ class TestMakeRunner:
                 grid = nvim.get_grid()
                 assert 'Test' not in grid and 'test' not in grid.lower(), \
                     f"UI should be closed after ESC.\nGrid:\n{grid}"
-                print("✓ test_close_with_escape passed")
 
     def test_navigate_with_ctrl_k(self):
         """Test navigating targets with Ctrl-k"""
@@ -385,7 +386,6 @@ class TestMakeRunner:
                 "third: ## Third target\n"
                 "\techo \"3\"\n"
             )
-
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
                 nvim.send_keys('m')
@@ -400,14 +400,15 @@ class TestMakeRunner:
                 # Should still see all targets (just selection moved)
                 nvim.assert_visible('first')
                 nvim.assert_visible('second')
-                print("✓ test_navigate_with_ctrl_k passed")
 
 
-class TestFileFinder:
+class TestFileFinder(unittest.TestCase):
     """E2E tests for file-finder"""
 
-    def __init__(self, config_dir):
-        self.config_dir = config_dir
+    @classmethod
+    def setUpClass(cls):
+        """Set up test class with config directory"""
+        cls.config_dir = Path.home() / '.config/nvim'
 
     def test_open_file_finder(self):
         """Test opening file-finder with 'o'"""
@@ -426,14 +427,12 @@ class TestFileFinder:
                 # Should see file list
                 nvim.assert_visible('fileA')
                 nvim.assert_visible('fileB')
-                print("✓ test_open_file_finder passed")
 
     def test_switch_files(self):
         """Test switching between files with file-finder"""
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / 'fileA.txt').write_text('content A')
             (Path(tmpdir) / 'fileB.txt').write_text('content B')
-
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir, filename='fileA.txt')
                 time.sleep(0.02)
@@ -450,28 +449,7 @@ class TestFileFinder:
                 # Should now see fileB content
                 nvim.assert_visible('content B')
                 nvim.assert_not_visible('content A')
-                print("✓ test_switch_files passed")
-
-
-def run_all_tests():
-    """Run all test suites"""
-    config_dir = Path.home() / '.config/nvim'
-    print("Running E2E tests for Neovim config (real terminal mode)...\n")
-    # Make-runner tests
-    print("=== Make-runner tests ===")
-    make_tests = TestMakeRunner(config_dir)
-    make_tests.test_open_make_runner()
-    make_tests.test_filter_targets()
-    make_tests.test_close_with_zero()
-    make_tests.test_close_with_escape()
-    make_tests.test_navigate_with_ctrl_k()
-    # File-finder tests
-    print("\n=== File-finder tests ===")
-    file_tests = TestFileFinder(config_dir)
-    file_tests.test_open_file_finder()
-    file_tests.test_switch_files()
-    print("\n✅ All tests passed!")
 
 
 if __name__ == '__main__':
-    run_all_tests()
+    unittest.main(verbosity=2)
