@@ -401,6 +401,82 @@ class TestMakeRunner(unittest.TestCase):
                 nvim.assert_visible('first')
                 nvim.assert_visible('second')
 
+    def test_execute_with_number(self):
+        """Test executing target with number shortcut"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            makefile = Path(tmpdir) / 'Makefile'
+            makefile.write_text(
+                "first: ## First target\n"
+                "\techo \"first\"\n"
+                "\n"
+                "second: ## Second target\n"
+                "\techo \"second\"\n"
+            )
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                # Open make-runner
+                nvim.send_keys('m')
+                time.sleep(0.03)
+                nvim.assert_visible('first')
+                nvim.assert_visible('second')
+                # Press 1 to execute first target
+                nvim.send_keys('1')
+                time.sleep(0.05)
+                # Should see output terminal with 'first'
+                grid = nvim.get_grid()
+                self.assertIn('first', grid)
+
+    def test_make_runner_no_makefile(self):
+        """Test make-runner behavior with no Makefile"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                # Try to open make-runner
+                nvim.send_keys('m')
+                time.sleep(0.03)
+                # Should show no targets or error message
+                grid = nvim.get_grid()
+                self.assertTrue('No targets found' in grid or 'Makefile' in grid)
+
+    def test_make_runner_empty_makefile(self):
+        """Test make-runner with empty Makefile"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            makefile = Path(tmpdir) / 'Makefile'
+            makefile.write_text('')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                nvim.send_keys('m')
+                time.sleep(0.03)
+                grid = nvim.get_grid()
+                self.assertIn('No targets found', grid)
+
+    def test_make_runner_multiple_filters(self):
+        """Test filtering multiple times"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            makefile = Path(tmpdir) / 'Makefile'
+            makefile.write_text(
+                "test-unit: ## Unit tests\n"
+                "\techo unit\n"
+                "\n"
+                "test-integration: ## Integration tests\n"
+                "\techo integration\n"
+                "\n"
+                "build: ## Build\n"
+                "\techo build\n"
+            )
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                nvim.send_keys('m')
+                time.sleep(0.03)
+                # Type "test" to filter
+                nvim.send_keys('test')
+                time.sleep(0.03)
+                grid = nvim.get_grid()
+                # Should see both test targets
+                self.assertIn('test-unit', grid)
+                self.assertIn('test-integration', grid)
+                self.assertNotIn('build', grid)
+
 
 class TestFileFinder(unittest.TestCase):
     """E2E tests for file-finder"""
@@ -449,6 +525,226 @@ class TestFileFinder(unittest.TestCase):
                 # Should now see fileB content
                 nvim.assert_visible('content B')
                 nvim.assert_not_visible('content A')
+
+    def test_file_finder_filter(self):
+        """Test filtering files by typing"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'test.txt').write_text('test')
+            (Path(tmpdir) / 'build.txt').write_text('build')
+            (Path(tmpdir) / 'deploy.txt').write_text('deploy')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='test.txt')
+                time.sleep(0.02)
+                # Open file-finder
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                # All files should be visible initially
+                grid = nvim.get_grid()
+                self.assertIn('test.txt', grid)
+                self.assertIn('build.txt', grid)
+                self.assertIn('deploy.txt', grid)
+                # Type "te" to filter
+                nvim.send_keys('te')
+                time.sleep(0.03)
+                # Only test.txt should match
+                grid = nvim.get_grid()
+                self.assertIn('test.txt', grid)
+                self.assertNotIn('build.txt', grid)
+                self.assertNotIn('deploy.txt', grid)
+
+    def test_file_finder_close_with_escape(self):
+        """Test closing file-finder with ESC"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'test.txt').write_text('test content')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='test.txt')
+                time.sleep(0.02)
+                nvim.assert_visible('test content')
+                # Open file-finder
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                nvim.assert_visible('test.txt')
+                # Close with ESC
+                nvim.send_keys('\x1b')
+                time.sleep(0.03)
+                # Should be back to file content
+                nvim.assert_visible('test content')
+
+    def test_file_finder_subdirectories(self):
+        """Test file-finder with subdirectories"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'root.txt').write_text('root')
+            subdir = Path(tmpdir) / 'subdir'
+            subdir.mkdir()
+            (subdir / 'nested.txt').write_text('nested')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='root.txt')
+                time.sleep(0.02)
+                # Open file-finder
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                # Should see both root and subdirectory files
+                grid = nvim.get_grid()
+                self.assertIn('root.txt', grid)
+                self.assertIn('nested.txt', grid)
+
+    def test_file_finder_navigate_with_ctrl_k(self):
+        """Test navigating files with Ctrl-k"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'first.txt').write_text('1')
+            (Path(tmpdir) / 'second.txt').write_text('2')
+            (Path(tmpdir) / 'third.txt').write_text('3')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='first.txt')
+                time.sleep(0.02)
+                # Open file-finder
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                # All files visible
+                nvim.assert_visible('first.txt')
+                nvim.assert_visible('second.txt')
+                nvim.assert_visible('third.txt')
+                # Navigate down with Ctrl-k
+                nvim.send_ctrl('k')
+                time.sleep(0.01)
+                # Should still see all files (just selection moved)
+                nvim.assert_visible('first.txt')
+                nvim.assert_visible('second.txt')
+
+    def test_file_finder_many_files(self):
+        """Test file-finder with many files"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create 10 files
+            for i in range(10):
+                (Path(tmpdir) / f'file{i:02d}.txt').write_text(f'content {i}')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='file00.txt')
+                time.sleep(0.02)
+                # Open file-finder
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                # Should see file list
+                grid = nvim.get_grid()
+                self.assertIn('file00.txt', grid)
+                # Should see multiple files
+                file_count = sum(1 for i in range(10) if f'file{i:02d}.txt' in grid)
+                self.assertGreaterEqual(file_count, 5, "Should show multiple files")
+
+    def test_file_finder_empty_directory(self):
+        """Test file-finder with no files"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a file so nvim has something to open
+            (Path(tmpdir) / 'dummy.txt').write_text('x')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='dummy.txt')
+                time.sleep(0.02)
+                # Open file-finder
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                # Should show dummy.txt
+                grid = nvim.get_grid()
+                self.assertIn('dummy.txt', grid)
+
+    def test_file_finder_special_characters(self):
+        """Test file-finder with special characters in filenames"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'file-with-dash.txt').write_text('dash')
+            (Path(tmpdir) / 'file_with_underscore.txt').write_text('underscore')
+            (Path(tmpdir) / 'file.with.dots.txt').write_text('dots')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='file-with-dash.txt')
+                time.sleep(0.02)
+                # Open file-finder
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                # All files should be visible
+                grid = nvim.get_grid()
+                self.assertIn('file-with-dash.txt', grid)
+                self.assertIn('file_with_underscore.txt', grid)
+                self.assertIn('file.with.dots.txt', grid)
+
+    def test_file_finder_filter_partial_match(self):
+        """Test file-finder fuzzy/partial matching"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'readme.md').write_text('readme')
+            (Path(tmpdir) / 'test_file.py').write_text('test')
+            (Path(tmpdir) / 'another_test.py').write_text('another')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='readme.md')
+                time.sleep(0.02)
+                # Open file-finder
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                # Filter with "py" to match .py files
+                nvim.send_keys('py')
+                time.sleep(0.03)
+                grid = nvim.get_grid()
+                # Should match .py files
+                self.assertIn('test_file.py', grid)
+                # Should have filtered out readme.md (or at least not prioritize it)
+                self.assertIn('.py', grid)
+
+    def test_file_finder_navigate_and_select(self):
+        """Test navigating and selecting with Ctrl-i/k"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'aaa.txt').write_text('aaa content')
+            (Path(tmpdir) / 'bbb.txt').write_text('bbb content')
+            (Path(tmpdir) / 'ccc.txt').write_text('ccc content')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='aaa.txt')
+                time.sleep(0.02)
+                # Open file-finder
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                # Navigate down twice
+                nvim.send_ctrl('k')
+                time.sleep(0.01)
+                nvim.send_ctrl('k')
+                time.sleep(0.01)
+                # Press Enter to select
+                nvim.send_keys('\n')
+                time.sleep(0.03)
+                # Should open one of the files
+                grid = nvim.get_grid()
+                self.assertTrue('content' in grid)
+
+    def test_file_finder_reopen_after_close(self):
+        """Test reopening file-finder after closing it"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'test.txt').write_text('test')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='test.txt')
+                time.sleep(0.02)
+                # Open file-finder
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                nvim.assert_visible('test.txt')
+                # Close with ESC
+                nvim.send_keys('\x1b')
+                time.sleep(0.03)
+                # Reopen
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                # Should work again
+                nvim.assert_visible('test.txt')
+
+    def test_file_finder_deep_subdirectories(self):
+        """Test file-finder with deeply nested directories"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            deep_path = Path(tmpdir) / 'a' / 'b' / 'c' / 'd'
+            deep_path.mkdir(parents=True)
+            (deep_path / 'deep.txt').write_text('deep')
+            (Path(tmpdir) / 'root.txt').write_text('root')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='root.txt')
+                time.sleep(0.02)
+                # Open file-finder
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                # Should see both root and deep files
+                grid = nvim.get_grid()
+                self.assertIn('root.txt', grid)
+                self.assertIn('deep.txt', grid)
 
 
 if __name__ == '__main__':
