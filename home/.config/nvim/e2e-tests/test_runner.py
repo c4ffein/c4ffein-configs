@@ -84,8 +84,8 @@ class NvimTerminal:
         self._read_output(timeout=0.02)
 
     def send_ctrl(self, char):
-        """Send Ctrl+key combination"""
-        # Ctrl+key is key code minus 64
+        """Send Ctrl+key combination, only works for A-Z"""
+        # Ctrl+key is key code minus 64 (works for A-Z)
         code = ord(char.upper()) - 64
         os.write(self.master_fd, bytes([code]))
         time.sleep(0.005)
@@ -794,7 +794,7 @@ class TestFileFinder(unittest.TestCase):
                 self.assertNotIn('testword line 9', grid, "Should not show line 9 (only first 3 lines)")
 
     def test_file_finder_plus_minus_keys(self):
-        """COMPREHENSIVE: Test +/- keys adjust line count per file"""
+        """COMPREHENSIVE: Test ≠/– (warning not regular -) keys adjust line count per file"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a file with many matching lines
             content = '\n'.join([f'XYZABC number {i}' for i in range(10)])
@@ -822,8 +822,8 @@ class TestFileFinder(unittest.TestCase):
                         # Hit another file or non-match content, stop counting
                         break
                 self.assertGreater(initial_count, 0, "Should show some matched lines initially")
-                # Press + to increase lines (give UI time to update)
-                nvim.send_keys('+')
+                # Press ≠ (could link to Ctrl+= in your term) to increase lines (give UI time to update)
+                nvim.send_keys('≠')
                 time.sleep(0.1)  # More time for grid to re-render
                 grid_after_plus = nvim.get_grid()
                 lines_after_plus = grid_after_plus.split('\n')
@@ -839,8 +839,8 @@ class TestFileFinder(unittest.TestCase):
                 # Check precisely +1 (should increase by exactly 1)
                 self.assertEqual(plus_count, initial_count + 1,
                     f"After +: should show exactly initial+1 lines. Initial={initial_count}, After +={plus_count}")
-                # Press - to decrease lines (should go back to initial)
-                nvim.send_keys('-')
+                # Press – (could link to Ctrl+- in your term - warning not regular -)(Ctrl+) to decrease lines
+                nvim.send_keys('–')
                 time.sleep(0.1)  # More time for grid to re-render
                 grid_after_minus = nvim.get_grid()
                 lines_after_minus = grid_after_minus.split('\n')
@@ -856,8 +856,8 @@ class TestFileFinder(unittest.TestCase):
                 # Check precisely went back to initial (should be exactly initial_count)
                 self.assertEqual(minus_count, initial_count,
                     f"After -: should show exactly initial count. Initial={initial_count}, After -={minus_count}")
-                # Press - again to go to initial-1
-                nvim.send_keys('-')
+                # Press – (Ctrl+-) again to go to initial-1
+                nvim.send_keys('–')
                 time.sleep(0.1)  # More time for grid to re-render
                 grid_after_minus2 = nvim.get_grid()
                 lines_after_minus2 = grid_after_minus2.split('\n')

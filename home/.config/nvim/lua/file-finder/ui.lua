@@ -277,11 +277,12 @@ function M.start(history_only_mode)
     update_display(filtered_files)
   end
 
-  -- Add keybindings for +/- to adjust lines per file
-  sk(M.prompt_buf, "i", "+", "", { callback = increase_lines_per_file, noremap = true, silent = true })
-  sk(M.prompt_buf, "i", "-", "", { callback = decrease_lines_per_file, noremap = true, silent = true })
-  sk(M.main_buf,   "n", "+", "", { callback = increase_lines_per_file, noremap = true, silent = true })
-  sk(M.main_buf,   "n", "-", "", { callback = decrease_lines_per_file, noremap = true, silent = true })
+  -- Add keybindings for ≠ (Ctrl+=) and – (Ctrl+-) to adjust lines per file
+  -- Configure in Alacritty: Ctrl+= sends ≠, Ctrl+- sends –
+  sk(M.prompt_buf, "i", "≠", "", { callback = increase_lines_per_file, noremap = true, silent = true })
+  sk(M.prompt_buf, "i", "–", "", { callback = decrease_lines_per_file, noremap = true, silent = true })
+  sk(M.main_buf,   "n", "≠", "", { callback = increase_lines_per_file, noremap = true, silent = true })
+  sk(M.main_buf,   "n", "–", "", { callback = decrease_lines_per_file, noremap = true, silent = true })
 
   update_display(filtered_files)
   vim.api.nvim_buf_set_lines(M.prompt_buf, 0, 1, false, { "> " .. visual_selection })  -- triggers recomputation
