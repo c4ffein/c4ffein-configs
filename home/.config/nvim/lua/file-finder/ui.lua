@@ -11,6 +11,7 @@ local api = vim.api
 local fn = vim.fn
 
 M.history_only_mode = false
+M.lines_per_file = 3  -- Number of matched lines to show per file (adjustable with +/-)
 M.main_buf,     M.prompt_buf,         M.backdrop_buf         = nil, nil, nil
 M.main_win,     M.prompt_win,         M.backdrop_win         = nil, nil, nil
 M.main_height,  M.prompt_win_height,  M.backdrop_win_height  =  20,  20,  20
@@ -84,17 +85,12 @@ function M.reset_windows()
   reset(M.prompt_win,   M.prompt_height,   M.prompt_width,   M.prompt_row,   M.prompt_col,   M.prompt_blend  )
 end
 
--- TODO ADAPT
---     for _, key in ipairs({'<Space>', '<BS>', '<Esc>', '<CR>'}) do add_hook(search_buf_id, key) end
---     for i = 48,  57 do add_hook(search_buf_id, string.char(i)) end  -- 0 to 9
-
 function M.setup_highlights()
   api.nvim_set_hl(0, "FileFinderPathCd",     { fg = "#BB88FF" })
   api.nvim_set_hl(0, "FileFinderPathHome",   { fg = "#FF6E6E" })
   api.nvim_set_hl(0, "FileFinderPathRoot",   { fg = "#88EEFF" })
   api.nvim_set_hl(0, "FileFinderLineNumber", { fg = "#777777" })
   api.nvim_set_hl(0, "FileFinderLineMatch",  { fg = "#FF92DF" })
-  api.nvim_set_hl(0, "FileFinderSelected",   { bg = "#444444" })  -- TODO choose colors
 end
 
 function M.update_results(buf, items, selected_line)
@@ -105,7 +101,6 @@ function M.update_results(buf, items, selected_line)
   api.nvim_buf_clear_namespace(buf, -1, 0, -1)
   
   for i, item in ipairs(items) do
-    -- if i == selected_line then api.nvim_buf_add_highlight(buf, -1, "FileFinderSelected", i, 0, -1) end  -- TODO
     for _, color in ipairs(M.lines_infos[i].colors) do
       api.nvim_buf_add_highlight(buf, -1, color[1], i - 1, color[2], color[3])
     end
@@ -153,8 +148,9 @@ local function update_display(filtered_files)
   for i = 1, math.min(#filtered_files, 50) do
     local item = filtered_files[i]
     if type(item) ~= "table" then vim.notify("update_display consumed a non table", vim.log.levels.ERROR); return end
-    -- TODO : ... after file name if more exemples?
+
     if not M.history_only_mode then
+      -- Show filename (without "..." - that comes after matched lines)
       table.insert(display_items, item.file)
       table.insert(M.lines_infos, { file = item.file, colors = { { "FileFinderPathCd", 0, 9000 } } })
     else
@@ -173,7 +169,10 @@ local function update_display(filtered_files)
       table.insert(M.lines_infos, { file = item.file, colors = colors })
     end
     if item.matched_lines and #item.matched_lines > 0 and not M.history_only_mode then
-      for j, match in ipairs(item.matched_lines) do
+      -- Show only up to lines_per_file matched lines
+      local lines_to_show = math.min(#item.matched_lines, M.lines_per_file)
+      for j = 1, lines_to_show do
+        local match = item.matched_lines[j]
         local line_number = string.rep(' ', math.max(0, 5 - #tostring(match.line_num))) .. match.line_num
         local content = match.content:gsub("^%s+", "")
         local color_offset = #content - #match.content + #line_number
@@ -184,6 +183,11 @@ local function update_display(filtered_files)
                      { "FileFinderLineMatch",  color_offset + match.start_pos, color_offset + match.end_pos + 1 } },
           line_number = match.line_num
         } )
+      end
+      -- DONE: Show "..." as an additional line if there are more matches than displayed
+      if #item.matched_lines > M.lines_per_file then
+        table.insert(display_items, "      ...")
+        table.insert(M.lines_infos, { file = item.file, colors = { { "FileFinderLineNumber", 0, 9000 } } })
       end
     end
   end
@@ -262,6 +266,23 @@ function M.start(history_only_mode)
     sk(M.prompt_buf, "i", tostring(i), "", { callback = key_callback,                noremap = true, silent = true })
     sk(M.main_buf,   "i", tostring(i), "", { callback = key_callback,                noremap = true, silent = true })
   end
+  -- Functions to adjust lines per file
+  local function increase_lines_per_file()
+    M.lines_per_file = math.min(M.lines_per_file + 1, config.max_lines_per_file)
+    update_display(filtered_files)
+  end
+
+  local function decrease_lines_per_file()
+    M.lines_per_file = math.max(M.lines_per_file - 1, 1)  -- Min 1 line per file
+    update_display(filtered_files)
+  end
+
+  -- Add keybindings for +/- to adjust lines per file
+  sk(M.prompt_buf, "i", "+", "", { callback = increase_lines_per_file, noremap = true, silent = true })
+  sk(M.prompt_buf, "i", "-", "", { callback = decrease_lines_per_file, noremap = true, silent = true })
+  sk(M.main_buf,   "n", "+", "", { callback = increase_lines_per_file, noremap = true, silent = true })
+  sk(M.main_buf,   "n", "-", "", { callback = decrease_lines_per_file, noremap = true, silent = true })
+
   update_display(filtered_files)
   vim.api.nvim_buf_set_lines(M.prompt_buf, 0, 1, false, { "> " .. visual_selection })  -- triggers recomputation
   vim.cmd("startinsert")

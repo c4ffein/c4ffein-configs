@@ -6,7 +6,7 @@ local history = require("file-finder.history")
 
 -- TODO when you add a file outside cd through the file explorer, it is still added to the current history
 -- TODO you can set cd from the file explorer
--- TODO + and - to get more and less lines per file
+-- DONE: + and - to get more and less lines per file (adjustable with M.lines_per_file, bound to +/- keys)
 
 function M.setup()
   vim.keymap.set("n", "o",     ui.start_history_only, {desc = "Find files (history only)", silent = true})

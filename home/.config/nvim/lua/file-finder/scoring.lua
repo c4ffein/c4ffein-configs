@@ -1,5 +1,6 @@
 local M = {}
 
+local config = require("file-finder.config")
 local files = require("file-finder.files")
 
 function M.score(pattern, str, skip_regex_matching)
@@ -41,7 +42,8 @@ function M.filter(pattern, items, key_func, file_only_mode)
         line_num = line_num + 1
         skip_regex_matching, current_score, start_pos, end_pos = M.score(pattern, line, skip_regex_matching)
         item_score = item_score + current_score
-        if current_score > 0 and #matched_lines < 3 then
+        -- Collect up to max_lines_per_file + 1 to know if "..." indicator is needed
+        if current_score > 0 and #matched_lines < config.max_lines_per_file + 1 then
           table.insert(matched_lines, {line_num = line_num, content = line, start_pos = start_pos, end_pos = end_pos})
         end
       end
