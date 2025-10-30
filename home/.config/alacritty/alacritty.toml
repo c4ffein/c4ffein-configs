@@ -13,6 +13,16 @@ key = "i"
 mods = "Control"
 chars = "\u001e"  # 0x1e = 30 = <C-^> = Record Separator
 
+[[keyboard.bindings]]
+key = "-"
+mods = "Control"
+chars = "\u2013"  # 0x2013 = 8211 = – (en dash) = Used in neovim as Ctrl--
+
+[[keyboard.bindings]]
+key = "="
+mods = "Control"
+chars = "\u2260"  # 0x2260 = 8800 = ≠ (not equal sign) = Used in neovim as Ctrl-=
+
 
 [window]          # Fixes MacOS Mission Control being laggy,
 opacity = 0.9999  # see https://github.com/alacritty/alacritty/issues/4474
