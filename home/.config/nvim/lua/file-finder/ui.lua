@@ -11,7 +11,7 @@ local api = vim.api
 local fn = vim.fn
 
 M.history_only_mode = false
-M.lines_per_file = 3  -- Number of matched lines to show per file (adjustable with +/-)
+M.lines_per_file = config.shown_lines_per_file  -- Number of matched lines to show per file (adjustable with +/-)
 M.main_buf,     M.prompt_buf,         M.backdrop_buf         = nil, nil, nil
 M.main_win,     M.prompt_win,         M.backdrop_win         = nil, nil, nil
 M.main_height,  M.prompt_win_height,  M.backdrop_win_height  =  20,  20,  20
@@ -268,7 +268,7 @@ function M.start(history_only_mode)
   end
   -- Functions to adjust lines per file
   local function increase_lines_per_file()
-    M.lines_per_file = math.min(M.lines_per_file + 1, config.max_lines_per_file)
+    M.lines_per_file = math.min(M.lines_per_file + 1, config.MAX_LINES_PER_FILE)
     update_display(filtered_files)
   end
 
