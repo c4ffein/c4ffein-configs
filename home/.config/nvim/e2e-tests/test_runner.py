@@ -746,6 +746,167 @@ class TestFileFinder(unittest.TestCase):
                 self.assertIn('root.txt', grid)
                 self.assertIn('deep.txt', grid)
 
+    def test_file_finder_lines_limited(self):
+        """COMPREHENSIVE: Test exact structure of limited lines with ... indicator"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a file with many lines containing 'testword'
+            content = '\n'.join([f'testword line {i}' for i in range(10)])
+            (Path(tmpdir) / 'many_matches.txt').write_text(content)
+            (Path(tmpdir) / 'dummy.txt').write_text('dummy')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='dummy.txt')
+                time.sleep(0.02)
+                # Open file-finder
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                # Search for 'testword' which appears 10 times
+                nvim.send_keys('testword')
+                time.sleep(0.05)
+                grid = nvim.get_grid()
+                lines = grid.split('\n')
+                # Find the line with the filename
+                filename_idx = None
+                for i, line in enumerate(lines):
+                    if 'many_matches.txt' in line:
+                        filename_idx = i
+                        break
+                self.assertIsNotNone(filename_idx, "Should find 'many_matches.txt' in grid")
+                # Preemptive check: ensure we have enough lines for the structure
+                self.assertGreater(len(lines), filename_idx + 4,
+                    f"Should have at least 4 lines after filename. Grid has {len(lines)} lines, filename at {filename_idx}")
+                # Check the structure: filename, then exactly 3 matched lines, then "..."
+                # Line filename_idx+1 should contain "testword line 0"
+                self.assertIn('testword line 0', lines[filename_idx + 1],
+                    f"Line after filename should be first match. Got: {lines[filename_idx + 1]}")
+                # Line filename_idx+2 should contain "testword line 1"
+                self.assertIn('testword line 1', lines[filename_idx + 2],
+                    f"Second line should be second match. Got: {lines[filename_idx + 2]}")
+                # Line filename_idx+3 should contain "testword line 2"
+                self.assertIn('testword line 2', lines[filename_idx + 3],
+                    f"Third line should be third match. Got: {lines[filename_idx + 3]}")
+                # Line filename_idx+4 should contain "..." (indicating more matches available)
+                line_with_dots = lines[filename_idx + 4].strip()
+                # Check if this line is "..." or contains "..."
+                if '...' in line_with_dots and 'testword' not in line_with_dots:
+                    self.assertTrue(line_with_dots.startswith('...') or '...' in line_with_dots,
+                        f"Fourth line after filename should be '...'. Got: {lines[filename_idx + 4]}")
+                # Verify we don't show line 9 (proves limiting works)
+                self.assertNotIn('testword line 9', grid, "Should not show line 9 (only first 3 lines)")
+
+    def test_file_finder_plus_minus_keys(self):
+        """COMPREHENSIVE: Test +/- keys adjust line count per file"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a file with many matching lines
+            content = '\n'.join([f'XYZABC number {i}' for i in range(10)])
+            (Path(tmpdir) / 'data.txt').write_text(content)
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='data.txt')
+                time.sleep(0.02)
+                # Open file-finder
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                # Search for 'XYZABC'
+                nvim.send_keys('XYZABC')
+                time.sleep(0.05)
+                grid = nvim.get_grid()
+                lines = grid.split('\n')
+                # Find filename and count matched lines after it
+                filename_idx = next((i for i, l in enumerate(lines) if 'data.txt' in l), None)
+                self.assertIsNotNone(filename_idx, "Should find 'data.txt' in grid")
+                # Count lines with "XYZABC number" after filename (before next file or empty)
+                initial_count = 0
+                for i in range(filename_idx + 1, len(lines)):
+                    if 'XYZABC number' in lines[i]:
+                        initial_count += 1
+                    elif lines[i].strip() and not lines[i].strip().startswith('~'):
+                        # Hit another file or non-match content, stop counting
+                        break
+                self.assertGreater(initial_count, 0, "Should show some matched lines initially")
+                # Press + to increase lines (give UI time to update)
+                nvim.send_keys('+')
+                time.sleep(0.1)  # More time for grid to re-render
+                grid_after_plus = nvim.get_grid()
+                lines_after_plus = grid_after_plus.split('\n')
+                # Count again after pressing +
+                filename_idx_plus = next((i for i, l in enumerate(lines_after_plus) if 'data.txt' in l), None)
+                self.assertIsNotNone(filename_idx_plus, "Should still find 'data.txt' after +")
+                plus_count = 0
+                for i in range(filename_idx_plus + 1, len(lines_after_plus)):
+                    if 'XYZABC number' in lines_after_plus[i]:
+                        plus_count += 1
+                    elif lines_after_plus[i].strip() and not lines_after_plus[i].strip().startswith('~'):
+                        break
+                # Check precisely +1 (should increase by exactly 1)
+                self.assertEqual(plus_count, initial_count + 1,
+                    f"After +: should show exactly initial+1 lines. Initial={initial_count}, After +={plus_count}")
+                # Press - to decrease lines (should go back to initial)
+                nvim.send_keys('-')
+                time.sleep(0.1)  # More time for grid to re-render
+                grid_after_minus = nvim.get_grid()
+                lines_after_minus = grid_after_minus.split('\n')
+                # Count again after pressing - (should be back to initial_count)
+                filename_idx_minus = next((i for i, l in enumerate(lines_after_minus) if 'data.txt' in l), None)
+                self.assertIsNotNone(filename_idx_minus, "Should still find 'data.txt' after -")
+                minus_count = 0
+                for i in range(filename_idx_minus + 1, len(lines_after_minus)):
+                    if 'XYZABC number' in lines_after_minus[i]:
+                        minus_count += 1
+                    elif lines_after_minus[i].strip() and not lines_after_minus[i].strip().startswith('~'):
+                        break
+                # Check precisely went back to initial (should be exactly initial_count)
+                self.assertEqual(minus_count, initial_count,
+                    f"After -: should show exactly initial count. Initial={initial_count}, After -={minus_count}")
+                # Press - again to go to initial-1
+                nvim.send_keys('-')
+                time.sleep(0.1)  # More time for grid to re-render
+                grid_after_minus2 = nvim.get_grid()
+                lines_after_minus2 = grid_after_minus2.split('\n')
+                filename_idx_minus2 = next((i for i, l in enumerate(lines_after_minus2) if 'data.txt' in l), None)
+                self.assertIsNotNone(filename_idx_minus2, "Should still find 'data.txt' after second -")
+                minus2_count = 0
+                for i in range(filename_idx_minus2 + 1, len(lines_after_minus2)):
+                    if 'XYZABC number' in lines_after_minus2[i]:
+                        minus2_count += 1
+                    elif lines_after_minus2[i].strip() and not lines_after_minus2[i].strip().startswith('~'):
+                        break
+                # Check we went to initial-1 (or stayed at minimum of 1)
+                self.assertEqual(minus2_count, max(1, initial_count - 1),
+                    f"After second -: should show initial-1 (or min 1). Initial={initial_count}, After second -={minus2_count}")
+
+    def test_file_finder_no_dots_when_few_lines(self):
+        """COMPREHENSIVE: Test that '...' does NOT appear when showing all matches"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a file with only 2 lines containing 'match' (less than default 3)
+            content = 'line 1 with match\nline 2 with match'
+            (Path(tmpdir) / 'few_matches.txt').write_text(content)
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='few_matches.txt')
+                time.sleep(0.02)
+                # Open file-finder
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                # Search for 'match'
+                nvim.send_keys('match')
+                time.sleep(0.03)
+                grid = nvim.get_grid()
+                lines = grid.split('\n')
+                # Find the filename
+                filename_idx = next((i for i, l in enumerate(lines) if 'few_matches.txt' in l), None)
+                self.assertIsNotNone(filename_idx, "Should find 'few_matches.txt' in grid")
+                # Check the structure: filename, then 2 matched lines, NO "..."
+                # Line filename_idx+1 should contain "line 1 with match"
+                if filename_idx + 1 < len(lines):
+                    self.assertIn('line 1 with match', lines[filename_idx + 1],
+                        f"First line after filename should be first match. Got: {lines[filename_idx + 1]}")
+                # Line filename_idx+2 should contain "line 2 with match"
+                if filename_idx + 2 < len(lines):
+                    self.assertIn('line 2 with match', lines[filename_idx + 2],
+                        f"Second line after filename should be second match. Got: {lines[filename_idx + 2]}")
+                # Simple loop: check that NO line after filename contains "..."
+                for i in range(filename_idx + 1, len(lines)):
+                    if '...' in lines[i]:
+                        self.fail(f"Found '...' in line {i} when there are only 2 matches (no truncation needed). Line: {lines[i]}")
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
