@@ -21,13 +21,14 @@ function M.score(pattern, str, skip_regex_matching)
   return                                         skip_regex_matching, 0, start_pos, end_pos
 end
 
-function M.filter(pattern, items, key_func, file_only_mode)
+function M.filter(pattern, items, key_func, file_only_mode, history_rank)
   -- TODO the state of pattern matching or no should be shown in the ui
   -- TODO handle this before, reuse history like with the o version?
   --      => so that path computation should actually be done elsewhere
   if not pattern or pattern == "" then return items end
   local scored_items, skip_regex_matching = {}, false
   key_func = key_func or function(item) return item end
+  history_rank = history_rank or {}
   for _, item in ipairs(items) do
     local file_path, key, item_score, current_score = item.file, key_func(item), 0, 0
     local printed_path = files.get_printable_file_infos(item.file).short_path -- may refactor to avoid double exec
@@ -49,12 +50,18 @@ function M.filter(pattern, items, key_func, file_only_mode)
       end
     end
     if item_score > 0 then
-      table.insert(scored_items, {file_path = file_path, score = item_score, key = key, matched_lines = matched_lines})
+      local rank = history_rank[file_path] or math.huge  -- Files not in history get worst rank
+      table.insert(scored_items, {file_path = file_path, score = item_score, key = key, matched_lines = matched_lines, history_rank = rank})
     end
   end
-  
+
   table.sort(scored_items, function(a, b)
-    return a.score > b.score
+    -- Primary sort by score (higher is better)
+    if a.score ~= b.score then
+      return a.score > b.score
+    end
+    -- Tiebreaker: use history rank (lower is better = more recent)
+    return a.history_rank < b.history_rank
   end)
   
   local result = {}

@@ -6,7 +6,6 @@ local history = require("file-finder.history")
 local scoring = require("file-finder.scoring")
 local ceil = math.ceil
 
--- TODO would be nice if equivalent scores would get ranked by history in file search mode
 local api = vim.api
 local fn = vim.fn
 
@@ -202,6 +201,19 @@ function M.start(history_only_mode)
   local all_files_from_history = history.load_history_for_ui()
   local obtained_files, filtered_files, selected_line, pattern = {}, {}, 1, ""
 
+  -- Build history rank map: file_path -> rank (lower = more recent)
+  -- Convert absolute paths from history to relative paths to match file tree
+  local history_rank = {}
+  for i, item in ipairs(all_files_from_history) do
+    local abs_path = item.file
+    local rel_path = abs_path
+    -- Convert absolute to relative if it starts with current directory
+    if abs_path:sub(1, #config.current_directory) == config.current_directory then
+      rel_path = abs_path:sub(#config.current_directory + 1)
+    end
+    history_rank[rel_path] = i
+  end
+
   M.setup_highlights()
   M.show_windows()
 
@@ -218,7 +230,7 @@ function M.start(history_only_mode)
     
     if new_pattern ~= pattern or force then
       pattern = new_pattern
-      filtered_files = scoring.filter(pattern, obtained_files, nil, M.history_only_mode)
+      filtered_files = scoring.filter(pattern, obtained_files, nil, M.history_only_mode, history_rank)
       selected_line = 1
       update_display(filtered_files)
     end

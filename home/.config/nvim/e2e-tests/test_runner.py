@@ -905,7 +905,69 @@ class TestFileFinder(unittest.TestCase):
                 # Simple loop: check that NO line after filename contains "..."
                 for i in range(filename_idx + 1, len(lines)):
                     if '...' in lines[i]:
-                        self.fail(f"Found '...' in line {i} when there are only 2 matches (no truncation needed). Line: {lines[i]}")
+                        self.fail(
+                            f"Found '...' in line {i} when there are only 2 matches (no truncation needed). "
+                            f"Line: {lines[i]}"
+                        )
+
+    def test_file_finder_history_ranking(self):
+        """COMPREHENSIVE: Test history-based ranking for files with equal scores"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create 3 files with identical content (same score when searched)
+            content = 'common keyword here\nanother line\n'
+            (Path(tmpdir) / 'file_a.txt').write_text(content)
+            (Path(tmpdir) / 'file_b.txt').write_text(content)
+            (Path(tmpdir) / 'file_c.txt').write_text(content)
+            with NvimTerminal(self.config_dir) as nvim:
+                # Open files in specific order to build history: a -> b -> c
+                # Start with file_a to establish initial file tree
+                nvim.start(cwd=tmpdir, filename='file_a.txt')
+                time.sleep(0.05)
+                # Open file_b and file_c to build history
+                # Use uppercase 'O' for FILE SEARCH mode (not history mode)
+                for filename in ['file_b.txt', 'file_c.txt']:
+                    nvim.send_keys('\x1b')  # Escape to ensure normal mode
+                    time.sleep(0.03)
+                    nvim.send_keys('O')  # Open file-finder (file search mode)
+                    time.sleep(0.08)
+                    nvim.send_keys(filename)
+                    time.sleep(0.08)
+                    nvim.send_keys('\n')  # Select file
+                    time.sleep(0.1)  # Wait for file to open
+                # Ensure we're in normal mode and file-finder is closed
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+                # Now use uppercase 'O' for FILE SEARCH mode and search for 'file_'
+                # All 3 files match the filename pattern with equal score
+                # History ranking should make them appear: c, b, a (most recent first)
+                nvim.send_keys('O')
+                time.sleep(0.1)
+                nvim.send_keys('file_')
+                time.sleep(0.15)
+                grid = nvim.get_grid()
+                lines = grid.split('\n')
+                # Find positions of each file in the results
+                file_a_idx = next((i for i, l in enumerate(lines) if 'file_a.txt' in l), None)
+                file_b_idx = next((i for i, l in enumerate(lines) if 'file_b.txt' in l), None)
+                file_c_idx = next((i for i, l in enumerate(lines) if 'file_c.txt' in l), None)
+                # All files should be present
+                self.assertIsNotNone(file_a_idx, "file_a.txt should appear in results")
+                self.assertIsNotNone(file_b_idx, "file_b.txt should appear in results")
+                self.assertIsNotNone(file_c_idx, "file_c.txt should appear in results")
+                # Verify history-based ranking: most recent (c) should be first
+                # Order should be: file_c, file_b, file_a (reverse of opening order)
+                self.assertLess(
+                    file_c_idx,
+                    file_b_idx,
+                    f"file_c.txt (most recent) should appear before file_b.txt. "
+                    f"Got c at {file_c_idx}, b at {file_b_idx}"
+                )
+                self.assertLess(
+                    file_b_idx,
+                    file_a_idx,
+                    f"file_b.txt should appear before file_a.txt (least recent). "
+                    f"Got b at {file_b_idx}, a at {file_a_idx}"
+                )
 
 
 if __name__ == '__main__':
