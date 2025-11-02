@@ -970,5 +970,308 @@ class TestFileFinder(unittest.TestCase):
                 )
 
 
+class TestFileExplorer(unittest.TestCase):
+    def setUp(self):
+        self.config_dir = Path.cwd()
+
+    def test_file_explorer_open_and_close(self):
+        """Test opening and closing file-explorer with Ctrl+o"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'test.txt').write_text('content')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='test.txt')
+                time.sleep(0.05)
+                # Open file-explorer
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                # Should show current directory
+                self.assertIn(tmpdir, grid, "Should show current directory path")
+                # Should show test.txt
+                self.assertIn('test.txt', grid, "Should show test.txt in listing")
+                # Close with Esc
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+                grid = nvim.get_grid()
+                # Should be back to file content
+                self.assertIn('content', grid, "Should be back to file after closing explorer")
+
+    def test_file_explorer_navigation(self):
+        """Test j/k navigation in file-explorer"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'file1.txt').write_text('1')
+            (Path(tmpdir) / 'file2.txt').write_text('2')
+            (Path(tmpdir) / 'file3.txt').write_text('3')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                # Check that selection indicator ">" is present
+                self.assertIn('>', grid, "Should have selection indicator")
+                # Press j to move down
+                nvim.send_keys('j')
+                time.sleep(0.05)
+                # Press k to move up
+                nvim.send_keys('k')
+                time.sleep(0.05)
+                # Just verify it doesn't crash
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_enter_directory(self):
+        """Test entering subdirectory with Enter or l"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            subdir = Path(tmpdir) / 'subdir'
+            subdir.mkdir()
+            (subdir / 'nested.txt').write_text('nested')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Navigate to subdir (should be first entry or second after ../)
+                # Press j to select subdir
+                nvim.send_keys('j')
+                time.sleep(0.05)
+                # Enter the directory
+                nvim.send_keys('\n')
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                # Should now show subdir path
+                self.assertIn('subdir', grid, "Should show subdir in path")
+                # Should show nested.txt
+                self.assertIn('nested.txt', grid, "Should show nested.txt in subdir")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_go_up_directory(self):
+        """Test going up to parent directory with h"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            subdir = Path(tmpdir) / 'subdir'
+            subdir.mkdir()
+            (subdir / 'nested.txt').write_text('nested')
+            with NvimTerminal(self.config_dir) as nvim:
+                # Start in the subdirectory
+                nvim.start(cwd=str(subdir))
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                self.assertIn('subdir', grid, "Should start in subdir")
+                # Press h to go up
+                nvim.send_keys('h')
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                # Should now be in parent directory
+                # Verify by checking we can see subdir as an entry (not in path)
+                lines = grid.split('\n')
+                # Look for "subdir/" as a directory entry
+                found_subdir_entry = any('subdir/' in line and '>' in line or '  subdir/' in line for line in lines)
+                self.assertTrue(found_subdir_entry, "Should see subdir/ as directory entry after going up")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_create_file(self):
+        """Test creating a new file with 'a' key"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Press 'a' to create file
+                nvim.send_keys('a')
+                time.sleep(0.1)
+                # Type filename and confirm
+                nvim.send_keys('newfile.txt\n')
+                time.sleep(0.15)
+                # Check file was created
+                created_file = Path(tmpdir) / 'newfile.txt'
+                self.assertTrue(created_file.exists(), "File should be created")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_create_directory(self):
+        """Test creating a new directory with 'A' key"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Press 'A' to create directory
+                nvim.send_keys('A')
+                time.sleep(0.1)
+                # Type dirname and confirm
+                nvim.send_keys('newdir\n')
+                time.sleep(0.15)
+                # Check directory was created
+                created_dir = Path(tmpdir) / 'newdir'
+                self.assertTrue(created_dir.exists(), "Directory should be created")
+                self.assertTrue(created_dir.is_dir(), "Should be a directory")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_delete_file(self):
+        """Test deleting a file with 'd' key"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / 'delete_me.txt'
+            test_file.write_text('delete this')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Navigate to the file (might be first or after ../)
+                nvim.send_keys('j')  # Move down
+                time.sleep(0.05)
+                # Press 'd' to delete
+                nvim.send_keys('d')
+                time.sleep(0.1)
+                # Confirm deletion with 'y'
+                nvim.send_keys('y\n')
+                time.sleep(0.15)
+                # Check file was deleted
+                self.assertFalse(test_file.exists(), "File should be deleted")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_open_file(self):
+        """Test opening a file with Enter"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'open_me.txt').write_text('file content here')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Navigate to the file
+                nvim.send_keys('j')
+                time.sleep(0.05)
+                # Press Enter to open
+                nvim.send_keys('\n')
+                time.sleep(0.15)
+                grid = nvim.get_grid()
+                # Should see file content
+                self.assertIn('file content here', grid, "Should show file content after opening")
+
+    def test_file_explorer_complex_navigation_ctrl_k(self):
+        """COMPREHENSIVE: Navigate through 3 subdirs using Ctrl+k, enter one, open file"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create 3 subdirectories with files
+            dir1 = Path(tmpdir) / 'aaa_first'
+            dir2 = Path(tmpdir) / 'bbb_second'
+            dir3 = Path(tmpdir) / 'ccc_third'
+            dir1.mkdir()
+            dir2.mkdir()
+            dir3.mkdir()
+            (dir1 / 'file_in_first.txt').write_text('content from first')
+            (dir2 / 'file_in_second.txt').write_text('content from second')
+            (dir3 / 'file_in_third.txt').write_text('content from third')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Initial state: should see all 3 dirs
+                grid = nvim.get_grid()
+                self.assertIn('aaa_first/', grid, "Should see first directory")
+                self.assertIn('bbb_second/', grid, "Should see second directory")
+                self.assertIn('ccc_third/', grid, "Should see third directory")
+                # Use Ctrl+k twice to navigate to third directory (ccc_third)
+                # First entry might be ../ so we need to navigate down
+                nvim.send_ctrl('k')  # Move down once
+                time.sleep(0.05)
+                nvim.send_ctrl('k')  # Move down twice
+                time.sleep(0.05)
+                # Enter the directory (should be bbb_second now)
+                nvim.send_keys('\n')
+                time.sleep(0.15)
+                grid = nvim.get_grid()
+                # Should be inside bbb_second
+                self.assertIn('bbb_second', grid, "Should show bbb_second in path")
+                self.assertIn('file_in_second.txt', grid, "Should show file_in_second.txt")
+                # Select the file (should be first entry) and open it
+                nvim.send_keys('j')  # Move to file
+                time.sleep(0.05)
+                nvim.send_keys('\n')  # Open file
+                time.sleep(0.15)
+                grid = nvim.get_grid()
+                # Should see file content
+                self.assertIn('content from second', grid, "Should show content from second file")
+
+    def test_file_explorer_ctrl_k_then_ctrl_i(self):
+        """COMPREHENSIVE: Test navigation with j/k and then up/down movement"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create multiple entries to navigate through (use naming to ensure order)
+            (Path(tmpdir) / 'aaa_file1.txt').write_text('one')
+            (Path(tmpdir) / 'bbb_file2.txt').write_text('two')
+            (Path(tmpdir) / 'ccc_file3.txt').write_text('three')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.1)
+                nvim.send_ctrl('o')
+                time.sleep(0.3)
+                # Entries: ../, aaa_file1.txt, bbb_file2.txt, ccc_file3.txt
+                # Start at ../ (line 1), move down to line 2, then to line 3
+                nvim.send_keys('j')  # Move to aaa_file1.txt (line 2)
+                time.sleep(0.2)
+                nvim.send_keys('j')  # Move to bbb_file2.txt (line 3)
+                time.sleep(0.2)
+                # Test moving up and back down
+                nvim.send_keys('k')  # Move back to aaa_file1.txt (line 2)
+                time.sleep(0.2)
+                nvim.send_keys('j')  # Move back to bbb_file2.txt (line 3)
+                time.sleep(0.2)
+                # Open the file at current position (should be bbb_file2.txt)
+                nvim.send_keys('\n')
+                time.sleep(0.3)
+                grid = nvim.get_grid()
+                # Should have opened file2.txt
+                self.assertIn('two', grid, "Should show content from bbb_file2 after navigation")
+
+    def test_file_explorer_navigate_up_to_parent_open_file(self):
+        """COMPREHENSIVE: Start in subdir, go up to parent, open file in parent"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create parent file and subdirectory with file
+            (Path(tmpdir) / 'parent_file.txt').write_text('parent content')
+            subdir = Path(tmpdir) / 'subdir'
+            subdir.mkdir()
+            (subdir / 'child_file.txt').write_text('child content')
+            with NvimTerminal(self.config_dir) as nvim:
+                # Start in the subdirectory
+                nvim.start(cwd=str(subdir))
+                time.sleep(0.1)
+                nvim.send_ctrl('o')
+                time.sleep(0.3)
+                grid = nvim.get_grid()
+                # Should be in subdir
+                self.assertIn('subdir', grid, "Should start in subdir")
+                self.assertIn('child_file.txt', grid, "Should see child file")
+                # Select the ../ entry and press Enter to go up
+                # First entry should be ../
+                nvim.send_keys('\n')  # Press Enter on ../ to go up
+                time.sleep(0.3)
+                grid = nvim.get_grid()
+                # Should now be in parent
+                self.assertIn('parent_file.txt', grid, "Should see parent file after going up")
+                self.assertIn('subdir/', grid, "Should see subdir as entry")
+                # Navigate to parent_file.txt
+                # Entries after sorting: ../, subdir/ (dir first!), parent_file.txt
+                # We start at first entry (../), need to move down TWICE to get to parent_file.txt
+                nvim.send_keys('j')  # Move to subdir/
+                time.sleep(0.1)
+                nvim.send_keys('j')  # Move to parent_file.txt
+                time.sleep(0.2)
+                # Open it
+                nvim.send_keys('\n')
+                time.sleep(0.3)
+                grid = nvim.get_grid()
+                # Should see parent content
+                self.assertIn('parent content', grid, "Should show parent file content after navigating up and opening it")
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

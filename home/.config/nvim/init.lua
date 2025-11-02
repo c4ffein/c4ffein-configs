@@ -78,8 +78,7 @@ function select_current_word()
   vim.api.nvim_win_set_cursor(0, { row, ((w_end ~= 0 and w_end) or 1) - 1 })
 end
 vim.keymap.set('n', '<C-v>', select_current_word, { desc = 'select word' })
--- TODO reimplement in lua with features like ijkl
-vim.keymap.set('n', '<C-o>', ':Explore<CR>', { desc = 'open file explorer' })
 
 require('file-finder').setup()
 require('make-runner').setup()
+require('file-explorer').setup()
