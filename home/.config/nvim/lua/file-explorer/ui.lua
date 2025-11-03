@@ -47,19 +47,49 @@ end
 local function update_display()
   if not M.main_buf or not vim.api.nvim_buf_is_valid(M.main_buf) then return end
   M.entries = get_directory_entries(M.current_dir)
+  -- Define highlight groups for invalid files
+  vim.api.nvim_set_hl(0, "FileExplorerInvalid", {fg = "#ff0000"})  -- Red
+  vim.api.nvim_set_hl(0, "FileExplorerInvalidChar", {fg = "#808080"})  -- Grey
   local lines = {}
   table.insert(lines, "  " .. M.current_dir)
   table.insert(lines, "")
   for i, entry in ipairs(M.entries) do
     local prefix = (i == M.selected_line) and "> " or "  "
-    table.insert(lines, prefix .. entry.name)
+    -- Check if filename is valid (skip ../ as it's always allowed)
+    local is_valid = (entry.name == "../") or operations.is_valid_filename(entry.name:gsub("/$", ""))
+    entry.is_valid = is_valid
+    if is_valid then
+      table.insert(lines, prefix .. entry.name)
+    else
+      -- Show sanitized version with X for forbidden chars
+      local sanitized = operations.sanitize_for_display(entry.name:gsub("/$", ""))
+      if entry.is_dir then sanitized = sanitized .. "/" end
+      table.insert(lines, prefix .. sanitized)
+    end
   end
   -- Make buffer modifiable to update lines
   vim.api.nvim_buf_set_option(M.main_buf, "modifiable", true)
   vim.api.nvim_buf_set_lines(M.main_buf, 0, -1, false, lines)
   vim.api.nvim_buf_set_option(M.main_buf, "modifiable", false)
-  -- Highlight selected line
+  -- Highlight selected line and invalid entries
   vim.api.nvim_buf_clear_namespace(M.main_buf, -1, 0, -1)
+  for i, entry in ipairs(M.entries) do
+    local line_idx = i + 1  -- +1 for header, +1 for empty line = i+2-1
+    if not entry.is_valid then
+      -- Highlight entire line in red
+      vim.api.nvim_buf_add_highlight(M.main_buf, -1, "FileExplorerInvalid", line_idx, 0, -1)
+      -- Find and highlight X characters in grey
+      local line_text = lines[line_idx + 1]
+      if line_text then
+        for j = 1, #line_text do
+          if line_text:sub(j, j) == "X" then
+            vim.api.nvim_buf_add_highlight(M.main_buf, -1, "FileExplorerInvalidChar", line_idx, j - 1, j)
+          end
+        end
+      end
+    end
+  end
+  -- Highlight selected line (on top of other highlights)
   if M.selected_line > 0 and M.selected_line <= #M.entries then
     vim.api.nvim_buf_add_highlight(M.main_buf, -1, "Visual", M.selected_line + 1, 0, -1)
   end
@@ -86,7 +116,22 @@ end
 local function enter_selected()
   if M.selected_line < 1 or M.selected_line > #M.entries then return end
   local entry = M.entries[M.selected_line]
+  -- SECURITY: Double-check validation before opening (defense in depth)
+  if entry.name ~= "../" then
+    local filename = entry.name:gsub("/$", "")
+    local is_valid = operations.is_valid_filename(filename)
+    if not is_valid then
+      vim.notify("Cannot open file with invalid characters: " .. entry.name, vim.log.levels.ERROR)
+      return
+    end
+  end
   if entry.is_dir then
+    -- SECURITY: Validate path before navigating (defense in depth)
+    local path_valid = operations.is_valid_path(entry.path)
+    if not path_valid then
+      vim.notify("Cannot navigate to directory with invalid path: " .. entry.path, vim.log.levels.ERROR)
+      return
+    end
     -- Navigate into directory
     M.current_dir = entry.path
     M.selected_line = 1
@@ -100,7 +145,14 @@ end
 
 local function go_up_directory()
   if M.current_dir == "/" then return end
-  M.current_dir = vim.fn.fnamemodify(M.current_dir, ":h")
+  local parent_path = vim.fn.fnamemodify(M.current_dir, ":h")
+  -- SECURITY: Validate parent path (defense in depth)
+  local path_valid = operations.is_valid_path(parent_path)
+  if not path_valid then
+    vim.notify("Cannot navigate to parent directory with invalid path: " .. parent_path, vim.log.levels.ERROR)
+    return
+  end
+  M.current_dir = parent_path
   M.selected_line = 1
   update_display()
 end

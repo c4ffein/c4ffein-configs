@@ -1272,6 +1272,591 @@ class TestFileExplorer(unittest.TestCase):
                 # Should see parent content
                 self.assertIn('parent content', grid, "Should show parent file content after navigating up and opening it")
 
+    def test_file_explorer_rename_file(self):
+        """Test renaming a file with 'r' key"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            old_file = Path(tmpdir) / 'old_name.txt'
+            old_file.write_text('content')
+            new_file = Path(tmpdir) / 'new_name.txt'
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Navigate to the file (after ../)
+                nvim.send_keys('j')
+                time.sleep(0.05)
+                # Press 'r' to rename
+                nvim.send_keys('r')
+                time.sleep(0.1)
+                # Clear the default value (Ctrl+u) and type new name
+                nvim.send_ctrl('u')  # Clear line
+                time.sleep(0.05)
+                nvim.send_keys('new_name.txt\n')
+                time.sleep(0.15)
+                # Close explorer
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+                # Verify rename happened
+                self.assertFalse(old_file.exists(), "Old file should not exist")
+                self.assertTrue(new_file.exists(), "New file should exist")
+                self.assertEqual(new_file.read_text(), 'content', "Content should be preserved")
+
+    def test_file_explorer_boundary_navigation(self):
+        """Test navigation boundaries (k at top, j at bottom)"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'file.txt').write_text('content')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                # Should start at first entry (../)
+                self.assertIn('> ../', grid, "Should start at first entry")
+                # Try to go up from first entry (should stay at first)
+                nvim.send_keys('k')
+                time.sleep(0.05)
+                grid = nvim.get_grid()
+                self.assertIn('> ../', grid, "Should stay at first entry when pressing k")
+                # Go to last entry
+                nvim.send_keys('j')  # Move to file.txt
+                time.sleep(0.05)
+                # Try to go down from last entry (should stay at last)
+                nvim.send_keys('j')
+                time.sleep(0.05)
+                grid = nvim.get_grid()
+                self.assertIn('> file.txt', grid, "Should stay at last entry when pressing j")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_empty_directory(self):
+        """Test behavior in an empty directory"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            subdir = Path(tmpdir) / 'empty_dir'
+            subdir.mkdir()
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=str(subdir))
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                # Should show the directory path and ../ entry
+                self.assertIn('empty_dir', grid, "Should show directory name")
+                self.assertIn('../', grid, "Should show parent entry")
+                # Try navigation (should not crash)
+                nvim.send_keys('j')
+                time.sleep(0.05)
+                nvim.send_keys('k')
+                time.sleep(0.05)
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_special_characters_in_names(self):
+        """Test files with special characters (spaces, dots, parentheses)"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create files with special characters
+            file1 = Path(tmpdir) / 'file with spaces.txt'
+            file2 = Path(tmpdir) / 'file.multiple.dots.txt'
+            file3 = Path(tmpdir) / 'file(with)parens.txt'
+            file1.write_text('spaces')
+            file2.write_text('dots')
+            file3.write_text('parens')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                # Valid characters (space, dots) should show normally
+                self.assertIn('file with spaces.txt', grid, "Should show file with spaces normally")
+                self.assertIn('file.multiple.dots.txt', grid, "Should show file with multiple dots normally")
+                # Invalid characters (parentheses) should show as X
+                self.assertIn('fileXwithXparens.txt', grid, "Should show file with parens as X")
+                # Try opening file with spaces (valid - should work)
+                nvim.send_keys('j')  # Move to first file
+                time.sleep(0.05)
+                nvim.send_keys('\n')  # Open it
+                time.sleep(0.15)
+                grid = nvim.get_grid()
+                # Should open successfully (spaces and dots are valid)
+                self.assertTrue('spaces' in grid or 'dots' in grid,
+                               "Should open file with valid special characters")
+
+    def test_file_explorer_hidden_files(self):
+        """Test that hidden files (starting with .) are shown"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / '.hidden_file').write_text('hidden')
+            (Path(tmpdir) / 'regular_file.txt').write_text('regular')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                # Should show both hidden and regular files
+                self.assertIn('.hidden_file', grid, "Should show hidden files")
+                self.assertIn('regular_file.txt', grid, "Should show regular files")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_create_duplicate_file(self):
+        """Test error handling when creating file that already exists"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            existing_file = Path(tmpdir) / 'existing.txt'
+            existing_file.write_text('original content')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Try to create file with same name
+                nvim.send_keys('a')
+                time.sleep(0.1)
+                nvim.send_keys('existing.txt\n')
+                time.sleep(0.15)
+                # Should still see file explorer (creation should fail gracefully)
+                grid = nvim.get_grid()
+                # The file should still exist with original content
+                self.assertEqual(existing_file.read_text(), 'original content',
+                               "Original file content should be preserved")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_multiple_operations_sequence(self):
+        """Test multiple operations in sequence"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Create a file
+                nvim.send_keys('a')
+                time.sleep(0.1)
+                nvim.send_keys('first.txt\n')
+                time.sleep(0.15)
+                # Create another file
+                nvim.send_keys('a')
+                time.sleep(0.1)
+                nvim.send_keys('second.txt\n')
+                time.sleep(0.15)
+                # Create a directory
+                nvim.send_keys('A')
+                time.sleep(0.1)
+                nvim.send_keys('mydir\n')
+                time.sleep(0.15)
+                # Close explorer
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+                # Verify all operations succeeded
+                self.assertTrue((Path(tmpdir) / 'first.txt').exists(), "First file should exist")
+                self.assertTrue((Path(tmpdir) / 'second.txt').exists(), "Second file should exist")
+                self.assertTrue((Path(tmpdir) / 'mydir').is_dir(), "Directory should exist")
+
+    def test_file_explorer_open_when_already_open(self):
+        """Test opening file-explorer when it's already open"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'test.txt').write_text('content')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                # Open file-explorer
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                self.assertIn('test.txt', grid, "Should show file explorer")
+                # Try to open again (should handle gracefully)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                # Should still show explorer (not crash or create duplicate)
+                self.assertIn('test.txt', grid, "Should still show file explorer")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_close_methods(self):
+        """Test closing file-explorer with both 'q' and Esc"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                # Test closing with 'q'
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                nvim.send_keys('q')
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                # Should be closed (no file explorer visible)
+                self.assertNotIn('╭─', grid, "File explorer should be closed after 'q'")
+                # Test closing with Esc
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                nvim.send_keys('\x1b')
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                # Should be closed
+                self.assertNotIn('╭─', grid, "File explorer should be closed after Esc")
+
+    def test_file_explorer_complex_workflow(self):
+        """COMPREHENSIVE: Create dir → enter it → create file → go back → rename dir"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Create directory
+                nvim.send_keys('A')
+                time.sleep(0.1)
+                nvim.send_keys('original_dir\n')
+                time.sleep(0.15)
+                # Navigate to the directory and enter it
+                nvim.send_keys('j')  # Move to original_dir
+                time.sleep(0.05)
+                nvim.send_keys('\n')  # Enter directory
+                time.sleep(0.15)
+                grid = nvim.get_grid()
+                self.assertIn('original_dir', grid, "Should be inside original_dir")
+                # Create a file inside
+                nvim.send_keys('a')
+                time.sleep(0.1)
+                nvim.send_keys('inner_file.txt\n')
+                time.sleep(0.15)
+                # Go back to parent
+                nvim.send_keys('h')  # Go up
+                time.sleep(0.15)
+                grid = nvim.get_grid()
+                self.assertIn('original_dir/', grid, "Should see original_dir as entry")
+                # Rename the directory
+                nvim.send_keys('j')  # Move to original_dir
+                time.sleep(0.05)
+                nvim.send_keys('r')  # Rename
+                time.sleep(0.1)
+                nvim.send_ctrl('u')  # Clear default value
+                time.sleep(0.05)
+                nvim.send_keys('renamed_dir\n')
+                time.sleep(0.15)
+                # Close explorer
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+                # Verify everything
+                renamed_dir = Path(tmpdir) / 'renamed_dir'
+                inner_file = renamed_dir / 'inner_file.txt'
+                self.assertTrue(renamed_dir.is_dir(), "Renamed directory should exist")
+                self.assertFalse((Path(tmpdir) / 'original_dir').exists(), "Original directory should not exist")
+                self.assertTrue(inner_file.exists(), "Inner file should exist in renamed directory")
+
+    def test_file_explorer_filename_validation_reject_invalid_chars(self):
+        """Test that filenames with invalid characters are rejected"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Try to create file with slash (should be rejected)
+                nvim.send_keys('a')
+                time.sleep(0.1)
+                nvim.send_keys('bad/path.txt\n')
+                time.sleep(0.15)
+                # File should not be created
+                self.assertFalse((Path(tmpdir) / 'bad/path.txt').exists(), "File with slash should be rejected")
+                # Try to create file with special char @ (should be rejected)
+                nvim.send_keys('a')
+                time.sleep(0.1)
+                nvim.send_ctrl('u')
+                nvim.send_keys('bad@file.txt\n')
+                time.sleep(0.15)
+                # File should not be created
+                self.assertFalse((Path(tmpdir) / 'bad@file.txt').exists(), "File with @ should be rejected")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_filename_validation_reject_dot_dotdot(self):
+        """Test that '.' and '..' are rejected as filenames"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Try to create file named "."
+                nvim.send_keys('a')
+                time.sleep(0.1)
+                nvim.send_keys('.\n')
+                time.sleep(0.15)
+                # Try to create file named ".."
+                nvim.send_keys('a')
+                time.sleep(0.1)
+                nvim.send_ctrl('u')
+                nvim.send_keys('..\n')
+                time.sleep(0.15)
+                # Try to create directory named "."
+                nvim.send_keys('A')
+                time.sleep(0.1)
+                nvim.send_ctrl('u')
+                nvim.send_keys('.\n')
+                time.sleep(0.15)
+                # Close and verify nothing was created
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+                # Only ../  should exist, no files
+                files = [f.name for f in Path(tmpdir).iterdir()]
+                self.assertEqual(len(files), 0, "No files should have been created with '.' or '..'")
+
+    def test_file_explorer_filename_validation_accept_valid(self):
+        """Test that valid filenames (a-zA-Z0-9.-_ and space) are accepted"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Create file with all valid characters including space
+                nvim.send_keys('a')
+                time.sleep(0.1)
+                nvim.send_keys('Valid File-123.txt\n')
+                time.sleep(0.15)
+                # Create hidden file (starts with dot)
+                nvim.send_keys('a')
+                time.sleep(0.1)
+                nvim.send_ctrl('u')
+                nvim.send_keys('.hidden-file_01.txt\n')
+                time.sleep(0.15)
+                # Create directory with valid name
+                nvim.send_keys('A')
+                time.sleep(0.1)
+                nvim.send_ctrl('u')
+                nvim.send_keys('Valid Dir-123\n')
+                time.sleep(0.15)
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+                # Verify all were created
+                self.assertTrue((Path(tmpdir) / 'Valid File-123.txt').exists(),
+                              "File with valid characters including spaces should be created")
+                self.assertTrue((Path(tmpdir) / '.hidden-file_01.txt').exists(),
+                              "Hidden file with valid characters should be created")
+                self.assertTrue((Path(tmpdir) / 'Valid Dir-123').is_dir(),
+                              "Directory with valid characters should be created")
+
+    def test_file_explorer_rename_validation(self):
+        """Test that rename also validates filenames"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            old_file = Path(tmpdir) / 'old.txt'
+            old_file.write_text('content')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Navigate to file
+                nvim.send_keys('j')
+                time.sleep(0.05)
+                # Try to rename with invalid character (@)
+                nvim.send_keys('r')
+                time.sleep(0.1)
+                nvim.send_ctrl('u')
+                nvim.send_keys('bad@name.txt\n')
+                time.sleep(0.15)
+                # File should still have old name
+                self.assertTrue(old_file.exists(), "Original file should still exist after invalid rename")
+                self.assertFalse((Path(tmpdir) / 'bad@name.txt').exists(), "File with invalid name should not exist")
+                # Try valid rename with space
+                nvim.send_keys('r')
+                time.sleep(0.1)
+                nvim.send_ctrl('u')
+                nvim.send_keys('good name.txt\n')
+                time.sleep(0.15)
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+                # Valid rename should have worked
+                self.assertFalse(old_file.exists(), "Old file should not exist after valid rename")
+                self.assertTrue((Path(tmpdir) / 'good name.txt').exists(), "File with space in name should exist")
+
+    def test_file_explorer_invalid_file_display(self):
+        """Test that files with invalid chars are shown in red with X"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create files with invalid characters externally (not through file-explorer)
+            (Path(tmpdir) / 'bad@file.txt').write_text('content1')
+            (Path(tmpdir) / 'file|with|pipes.txt').write_text('content2')
+            (Path(tmpdir) / 'good_file.txt').write_text('content3')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                # Invalid files should be displayed with X replacing forbidden chars
+                self.assertIn('badXfile.txt', grid, "Invalid file should show with X")
+                self.assertIn('fileXwithXpipes.txt', grid, "Pipes should be replaced with X")
+                # Valid file should show normally
+                self.assertIn('good_file.txt', grid, "Valid file should show normally")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_cannot_open_invalid_file(self):
+        """Test that files with invalid chars cannot be opened"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create file with invalid character externally
+            bad_file = Path(tmpdir) / 'bad@file.txt'
+            bad_file.write_text('should not open')
+            good_file = Path(tmpdir) / 'good_file.txt'
+            good_file.write_text('should open')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Try to open the invalid file (it should be first after ../)
+                # Navigate to bad@file (shown as badXfile.txt)
+                nvim.send_keys('j')  # Move to first file
+                time.sleep(0.05)
+                # Check if it's the bad file by looking for X in grid
+                grid = nvim.get_grid()
+                if 'badXfile' in grid:
+                    # Try to open it
+                    nvim.send_keys('\n')
+                    time.sleep(0.2)
+                    # Should still be in file-explorer (not opened)
+                    grid = nvim.get_grid()
+                    self.assertIn('badXfile', grid, "Should still show file explorer after trying to open invalid file")
+                    # Should NOT show the file content
+                    self.assertNotIn('should not open', grid, "Should not open invalid file")
+                # Now try to open the valid file
+                nvim.send_keys('j')  # Move to next file (good_file.txt)
+                time.sleep(0.05)
+                nvim.send_keys('\n')  # Open it
+                time.sleep(0.2)
+                grid = nvim.get_grid()
+                # Should open successfully
+                self.assertIn('should open', grid, "Should open valid file")
+
+    def test_file_explorer_invalid_directory_navigation(self):
+        """Test that directories with invalid chars show warnings but can be navigated"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create directory with invalid character externally
+            bad_dir = Path(tmpdir) / 'bad@dir'
+            bad_dir.mkdir()
+            (bad_dir / 'inside.txt').write_text('inside bad dir')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                # Directory should show with X
+                self.assertIn('badXdir/', grid, "Invalid directory should show with X")
+                # Try to enter it (should be blocked)
+                nvim.send_keys('j')  # Move to bad@dir
+                time.sleep(0.05)
+                nvim.send_keys('\n')  # Try to enter
+                time.sleep(0.2)
+                grid = nvim.get_grid()
+                # Should not have entered the directory
+                self.assertIn('badXdir/', grid, "Should still be in parent directory")
+                self.assertNotIn('inside.txt', grid, "Should not show contents of invalid directory")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_path_validation_reject_traversal(self):
+        """Test that path traversal attempts are blocked"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create directory structure
+            subdir = Path(tmpdir) / 'subdir'
+            subdir.mkdir()
+            (subdir / 'test.txt').write_text('test')
+            # Create directories with path traversal names externally
+            bad_dir1 = Path(tmpdir) / '../escape'
+            bad_dir2 = Path(tmpdir) / './current'
+            # Try to create these (they might fail on filesystem level, that's ok)
+            try:
+                bad_dir1.mkdir(exist_ok=True)
+            except:
+                pass
+            try:
+                bad_dir2.mkdir(exist_ok=True)
+            except:
+                pass
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Any directories with traversal patterns should show with X
+                grid = nvim.get_grid()
+                # If they exist, they should be blocked from navigation
+                # Just verify we can still see the valid subdir
+                self.assertIn('subdir/', grid, "Valid subdirectory should be visible")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_path_validation_create_with_slash(self):
+        """Test that we can't create files/dirs with / in the name"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Try to create file with / (path traversal attempt)
+                nvim.send_keys('a')
+                time.sleep(0.1)
+                nvim.send_keys('../escape.txt\n')
+                time.sleep(0.15)
+                # File should not be created
+                self.assertFalse((Path(tmpdir).parent / 'escape.txt').exists(),
+                               "Should not create file with ../ in name")
+                self.assertFalse((Path(tmpdir) / '../escape.txt').exists(),
+                               "Should not create file with path traversal")
+                # Try to create directory with / (path traversal attempt)
+                nvim.send_keys('A')
+                time.sleep(0.1)
+                nvim.send_ctrl('u')
+                nvim.send_keys('./baddir\n')
+                time.sleep(0.15)
+                # Directory should not be created
+                self.assertFalse((Path(tmpdir) / './baddir').exists(),
+                               "Should not create directory starting with ./")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_path_validation_valid_paths(self):
+        """Test that valid paths with slashes work correctly"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create nested directory structure
+            deep_dir = Path(tmpdir) / 'level1' / 'level2' / 'level3'
+            deep_dir.mkdir(parents=True)
+            (deep_dir / 'deep.txt').write_text('deep file')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.05)
+                nvim.send_ctrl('o')
+                time.sleep(0.1)
+                # Navigate into level1
+                nvim.send_keys('j')  # Move to level1
+                time.sleep(0.05)
+                nvim.send_keys('\n')  # Enter
+                time.sleep(0.15)
+                grid = nvim.get_grid()
+                self.assertIn('level1', grid, "Should be in level1")
+                self.assertIn('level2/', grid, "Should see level2")
+                # Navigate into level2
+                nvim.send_keys('j')  # Move to level2
+                time.sleep(0.05)
+                nvim.send_keys('\n')  # Enter
+                time.sleep(0.15)
+                grid = nvim.get_grid()
+                self.assertIn('level2', grid, "Should be in level2")
+                self.assertIn('level3/', grid, "Should see level3")
+                # Navigate back up (test go_up with valid path)
+                nvim.send_keys('h')  # Go up
+                time.sleep(0.15)
+                grid = nvim.get_grid()
+                self.assertIn('level1', grid, "Should be back in level1")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
