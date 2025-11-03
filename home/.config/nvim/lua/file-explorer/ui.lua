@@ -3,6 +3,8 @@ local M = {}
 local operations = require("file-explorer.operations")
 
 -- State
+M.path_buf = nil
+M.path_win = nil
 M.main_buf = nil
 M.main_win = nil
 M.backdrop_buf = nil
@@ -15,7 +17,7 @@ local function get_directory_entries(dir)
   local entries = {}
   -- Add parent directory entry (unless we're at root)
   if dir ~= "/" then
-    table.insert(entries, {name = "../", is_dir = true, path = vim.fn.fnamemodify(dir, ":h")})
+    table.insert(entries, {name = "../", is_dir = true, is_parent = true, path = vim.fn.fnamemodify(dir, ":h")})
   end
   local items = vim.fn.readdir(dir, function(item)
     return item ~= "." and item ~= ".."
@@ -38,48 +40,65 @@ local function get_directory_entries(dir)
   for _, item in ipairs(items) do
     local full_path = dir .. "/" .. item
     local is_dir = vim.fn.isdirectory(full_path) == 1
+    local is_symlink = vim.fn.getftype(full_path) == "link"
     local display_name = is_dir and (item .. "/") or item
-    table.insert(entries, {name = display_name, is_dir = is_dir, path = full_path})
+    table.insert(entries, {name = display_name, is_dir = is_dir, is_symlink = is_symlink, path = full_path})
   end
   return entries
 end
 
 local function update_display()
   if not M.main_buf or not vim.api.nvim_buf_is_valid(M.main_buf) then return end
+  if not M.path_buf or not vim.api.nvim_buf_is_valid(M.path_buf) then return end
   M.entries = get_directory_entries(M.current_dir)
-  -- Define highlight groups for invalid files
+  -- Define highlight groups (matching colors from c4ffein theme)
   vim.api.nvim_set_hl(0, "FileExplorerInvalid", {fg = "#ff0000"})  -- Red
   vim.api.nvim_set_hl(0, "FileExplorerInvalidChar", {fg = "#808080"})  -- Grey
-  local lines = {}
-  table.insert(lines, "  " .. M.current_dir)
-  table.insert(lines, "")
+  vim.api.nvim_set_hl(0, "FileExplorerParent", {fg = "#777777"})  -- Grey for ../
+  vim.api.nvim_set_hl(0, "FileExplorerDir", {fg = "#88EEFF"})  -- Cyan for directories
+  vim.api.nvim_set_hl(0, "FileExplorerSymlink", {fg = "#88FFAA"})  -- Green for symlinks
+  vim.api.nvim_set_hl(0, "FileExplorerPath", {fg = "#BB88FF"})  -- Purple for path
+  -- Update path window (top)
+  local path_lines = {M.current_dir}
+  vim.api.nvim_buf_set_option(M.path_buf, "modifiable", true)
+  vim.api.nvim_buf_set_lines(M.path_buf, 0, -1, false, path_lines)
+  vim.api.nvim_buf_set_option(M.path_buf, "modifiable", false)
+  -- Highlight path in purple
+  vim.api.nvim_buf_clear_namespace(M.path_buf, -1, 0, -1)
+  vim.api.nvim_buf_add_highlight(M.path_buf, -1, "FileExplorerPath", 0, 0, -1)
+  -- Update file list window (bottom)
+  local file_lines = {}
   for i, entry in ipairs(M.entries) do
     local prefix = (i == M.selected_line) and "> " or "  "
     -- Check if filename is valid (skip ../ as it's always allowed)
     local is_valid = (entry.name == "../") or operations.is_valid_filename(entry.name:gsub("/$", ""))
     entry.is_valid = is_valid
     if is_valid then
-      table.insert(lines, prefix .. entry.name)
+      table.insert(file_lines, prefix .. entry.name)
     else
       -- Show sanitized version with X for forbidden chars
       local sanitized = operations.sanitize_for_display(entry.name:gsub("/$", ""))
       if entry.is_dir then sanitized = sanitized .. "/" end
-      table.insert(lines, prefix .. sanitized)
+      table.insert(file_lines, prefix .. sanitized)
     end
   end
   -- Make buffer modifiable to update lines
   vim.api.nvim_buf_set_option(M.main_buf, "modifiable", true)
-  vim.api.nvim_buf_set_lines(M.main_buf, 0, -1, false, lines)
+  -- Clear all existing lines first
+  vim.api.nvim_buf_set_lines(M.main_buf, 0, -1, true, {})
+  -- Then set new lines
+  vim.api.nvim_buf_set_lines(M.main_buf, 0, -1, false, file_lines)
   vim.api.nvim_buf_set_option(M.main_buf, "modifiable", false)
-  -- Highlight selected line and invalid entries
+  -- Highlight entries by type and validation
   vim.api.nvim_buf_clear_namespace(M.main_buf, -1, 0, -1)
   for i, entry in ipairs(M.entries) do
-    local line_idx = i + 1  -- +1 for header, +1 for empty line = i+2-1
+    local line_idx = i - 1  -- Files now start at line 0 (no header)
+    local prefix_len = 2  -- Length of "> " or "  " prefix
     if not entry.is_valid then
-      -- Highlight entire line in red
+      -- Highlight entire line in red (invalid files)
       vim.api.nvim_buf_add_highlight(M.main_buf, -1, "FileExplorerInvalid", line_idx, 0, -1)
       -- Find and highlight X characters in grey
-      local line_text = lines[line_idx + 1]
+      local line_text = file_lines[i]
       if line_text then
         for j = 1, #line_text do
           if line_text:sub(j, j) == "X" then
@@ -87,21 +106,44 @@ local function update_display()
           end
         end
       end
+    else
+      -- Apply color based on entry type (skip prefix ">" or " ")
+      if entry.is_parent then
+        -- ../ in grey
+        vim.api.nvim_buf_add_highlight(M.main_buf, -1, "FileExplorerParent", line_idx, prefix_len, -1)
+      elseif entry.is_symlink then
+        -- Symlinks in green
+        vim.api.nvim_buf_add_highlight(M.main_buf, -1, "FileExplorerSymlink", line_idx, prefix_len, -1)
+      elseif entry.is_dir then
+        -- Directories in cyan
+        vim.api.nvim_buf_add_highlight(M.main_buf, -1, "FileExplorerDir", line_idx, prefix_len, -1)
+      end
+      -- Files remain white (default, no highlight needed)
     end
   end
   -- Highlight selected line (on top of other highlights)
   if M.selected_line > 0 and M.selected_line <= #M.entries then
-    vim.api.nvim_buf_add_highlight(M.main_buf, -1, "Visual", M.selected_line + 1, 0, -1)
+    vim.api.nvim_buf_add_highlight(M.main_buf, -1, "Visual", M.selected_line - 1, 0, -1)
+  end
+  -- Position cursor at the selected line, leftmost position (column 0)
+  -- This makes the cursor appear at the ">" marker position
+  if M.main_win and vim.api.nvim_win_is_valid(M.main_win) then
+    vim.api.nvim_win_set_cursor(M.main_win, {M.selected_line, 0})
   end
 end
 
 function M.close()
+  if M.path_win and vim.api.nvim_win_is_valid(M.path_win) then
+    vim.api.nvim_win_close(M.path_win, true)
+  end
   if M.main_win and vim.api.nvim_win_is_valid(M.main_win) then
     vim.api.nvim_win_close(M.main_win, true)
   end
   if M.backdrop_win and vim.api.nvim_win_is_valid(M.backdrop_win) then
     vim.api.nvim_win_close(M.backdrop_win, true)
   end
+  M.path_buf = nil
+  M.path_win = nil
   M.main_buf = nil
   M.main_win = nil
   M.backdrop_buf = nil
@@ -111,6 +153,17 @@ end
 local function move_selection(delta)
   M.selected_line = math.max(1, math.min(#M.entries, M.selected_line + delta))
   update_display()
+end
+
+local function handle_mouse_click()
+  -- Get cursor position after mouse click
+  local cursor = vim.api.nvim_win_get_cursor(M.main_win)
+  local clicked_line = cursor[1]
+  -- Update selection to clicked line
+  if clicked_line >= 1 and clicked_line <= #M.entries then
+    M.selected_line = clicked_line
+    update_display()
+  end
 end
 
 local function enter_selected()
@@ -237,19 +290,37 @@ function M.open()
     zindex = 1
   })
   vim.api.nvim_win_set_option(M.backdrop_win, "winblend", 30)
-  -- Create main window
+  -- Create windows (path window at top, file list at bottom)
   local width = math.floor(vim.o.columns * 0.7)
-  local height = math.floor(vim.o.lines * 0.7)
-  local row = math.floor((vim.o.lines - height) / 2)
+  local total_height = math.floor(vim.o.lines * 0.7)
+  local row = math.floor((vim.o.lines - total_height) / 2)
   local col = math.floor((vim.o.columns - width) / 2)
+  -- Create path display window (top, 1 line, no padding)
+  local path_height = 1
+  M.path_buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_option(M.path_buf, "bufhidden", "wipe")
+  vim.api.nvim_buf_set_option(M.path_buf, "modifiable", false)
+  M.path_win = vim.api.nvim_open_win(M.path_buf, false, {
+    relative = "editor",
+    width = width,
+    height = path_height,
+    row = row,
+    col = col,
+    style = "minimal",
+    border = "rounded",
+    zindex = 2
+  })
+  -- Create file list window (bottom, remaining space)
+  -- path_height + 2 (borders) + 1 (gap) = path_height + 3
+  local main_height = total_height - path_height - 3
   M.main_buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_option(M.main_buf, "bufhidden", "wipe")
   vim.api.nvim_buf_set_option(M.main_buf, "modifiable", false)
   M.main_win = vim.api.nvim_open_win(M.main_buf, true, {
     relative = "editor",
     width = width,
-    height = height,
-    row = row,
+    height = main_height,
+    row = row + path_height + 3,  -- +2 for borders, +1 for gap
     col = col,
     style = "minimal",
     border = "rounded",
@@ -257,18 +328,24 @@ function M.open()
   })
   -- Set keybindings
   local opts = {buffer = M.main_buf, noremap = true, silent = true}
-  vim.keymap.set("n", "j", function() move_selection(1) end, opts)
-  vim.keymap.set("n", "k", function() move_selection(-1) end, opts)
+  -- Navigation (multiple options for convenience)
+  vim.keymap.set("n", "<Down>", function() move_selection(1) end, opts)  -- Arrow key down
+  vim.keymap.set("n", "<Up>", function() move_selection(-1) end, opts)  -- Arrow key up
   vim.keymap.set("n", "<C-k>", function() move_selection(1) end, opts)  -- Match file-finder
   vim.keymap.set("n", "<C-^>", function() move_selection(-1) end, opts)  -- Ctrl+i equivalent
+  -- Mouse support
+  vim.keymap.set("n", "<LeftMouse>", handle_mouse_click, opts)
+  vim.keymap.set("n", "<2-LeftMouse>", function()
+    handle_mouse_click()
+    enter_selected()
+  end, opts)
+  -- Actions
   vim.keymap.set("n", "<CR>", enter_selected, opts)
-  vim.keymap.set("n", "l", enter_selected, opts)
-  vim.keymap.set("n", "h", go_up_directory, opts)
-  vim.keymap.set("n", "a", create_file, opts)
-  vim.keymap.set("n", "A", create_directory, opts)
-  vim.keymap.set("n", "d", delete_selected, opts)
-  vim.keymap.set("n", "r", rename_selected, opts)
-  vim.keymap.set("n", "q", M.close, opts)
+  vim.keymap.set("n", "<BS>", go_up_directory, opts)
+  vim.keymap.set("n", "<C-n>", create_file, opts)
+  vim.keymap.set("n", "<C-f>", create_directory, opts)
+  vim.keymap.set("n", "<C-d>", delete_selected, opts)
+  vim.keymap.set("n", "<C-r>", rename_selected, opts)
   vim.keymap.set("n", "<Esc>", M.close, opts)
   update_display()
 end

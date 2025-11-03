@@ -996,30 +996,6 @@ class TestFileExplorer(unittest.TestCase):
                 # Should be back to file content
                 self.assertIn('content', grid, "Should be back to file after closing explorer")
 
-    def test_file_explorer_navigation(self):
-        """Test j/k navigation in file-explorer"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            (Path(tmpdir) / 'file1.txt').write_text('1')
-            (Path(tmpdir) / 'file2.txt').write_text('2')
-            (Path(tmpdir) / 'file3.txt').write_text('3')
-            with NvimTerminal(self.config_dir) as nvim:
-                nvim.start(cwd=tmpdir)
-                time.sleep(0.05)
-                nvim.send_ctrl('o')
-                time.sleep(0.1)
-                grid = nvim.get_grid()
-                # Check that selection indicator ">" is present
-                self.assertIn('>', grid, "Should have selection indicator")
-                # Press j to move down
-                nvim.send_keys('j')
-                time.sleep(0.05)
-                # Press k to move up
-                nvim.send_keys('k')
-                time.sleep(0.05)
-                # Just verify it doesn't crash
-                nvim.send_keys('\x1b')
-                time.sleep(0.05)
-
     def test_file_explorer_enter_directory(self):
         """Test entering subdirectory with Enter or l"""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1033,7 +1009,7 @@ class TestFileExplorer(unittest.TestCase):
                 time.sleep(0.1)
                 # Navigate to subdir (should be first entry or second after ../)
                 # Press j to select subdir
-                nvim.send_keys('j')
+                nvim.send_ctrl('k')
                 time.sleep(0.05)
                 # Enter the directory
                 nvim.send_keys('\n')
@@ -1061,15 +1037,14 @@ class TestFileExplorer(unittest.TestCase):
                 grid = nvim.get_grid()
                 self.assertIn('subdir', grid, "Should start in subdir")
                 # Press h to go up
-                nvim.send_keys('h')
+                nvim.send_keys('\x7f')
                 time.sleep(0.1)
                 grid = nvim.get_grid()
                 # Should now be in parent directory
-                # Verify by checking we can see subdir as an entry (not in path)
-                lines = grid.split('\n')
-                # Look for "subdir/" as a directory entry
-                found_subdir_entry = any('subdir/' in line and '>' in line or '  subdir/' in line for line in lines)
-                self.assertTrue(found_subdir_entry, "Should see subdir/ as directory entry after going up")
+                # Verify by checking we can see subdir as an entry
+                self.assertIn('subdir/', grid, "Should see subdir/ as directory entry after going up")
+                # Also verify path changed (tmpXXX should be in path, not tmpXXX/subdir)
+                self.assertNotIn('/subdir', grid.split('╭')[0] if '╭' in grid else grid[:200], "Path should not contain /subdir anymore")
                 nvim.send_keys('\x1b')
                 time.sleep(0.05)
 
@@ -1082,7 +1057,7 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.send_ctrl('o')
                 time.sleep(0.1)
                 # Press 'a' to create file
-                nvim.send_keys('a')
+                nvim.send_ctrl('n')
                 time.sleep(0.1)
                 # Type filename and confirm
                 nvim.send_keys('newfile.txt\n')
@@ -1102,7 +1077,7 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.send_ctrl('o')
                 time.sleep(0.1)
                 # Press 'A' to create directory
-                nvim.send_keys('A')
+                nvim.send_ctrl('f')
                 time.sleep(0.1)
                 # Type dirname and confirm
                 nvim.send_keys('newdir\n')
@@ -1125,10 +1100,10 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.send_ctrl('o')
                 time.sleep(0.1)
                 # Navigate to the file (might be first or after ../)
-                nvim.send_keys('j')  # Move down
+                nvim.send_ctrl('k')  # Move down
                 time.sleep(0.05)
                 # Press 'd' to delete
-                nvim.send_keys('d')
+                nvim.send_ctrl('d')
                 time.sleep(0.1)
                 # Confirm deletion with 'y'
                 nvim.send_keys('y\n')
@@ -1148,7 +1123,7 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.send_ctrl('o')
                 time.sleep(0.1)
                 # Navigate to the file
-                nvim.send_keys('j')
+                nvim.send_ctrl('k')
                 time.sleep(0.05)
                 # Press Enter to open
                 nvim.send_keys('\n')
@@ -1194,7 +1169,7 @@ class TestFileExplorer(unittest.TestCase):
                 self.assertIn('bbb_second', grid, "Should show bbb_second in path")
                 self.assertIn('file_in_second.txt', grid, "Should show file_in_second.txt")
                 # Select the file (should be first entry) and open it
-                nvim.send_keys('j')  # Move to file
+                nvim.send_ctrl('k')  # Move to file
                 time.sleep(0.05)
                 nvim.send_keys('\n')  # Open file
                 time.sleep(0.15)
@@ -1203,7 +1178,7 @@ class TestFileExplorer(unittest.TestCase):
                 self.assertIn('content from second', grid, "Should show content from second file")
 
     def test_file_explorer_ctrl_k_then_ctrl_i(self):
-        """COMPREHENSIVE: Test navigation with j/k and then up/down movement"""
+        """COMPREHENSIVE: Test navigation with Ctrl+k and Ctrl+i"""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create multiple entries to navigate through (use naming to ensure order)
             (Path(tmpdir) / 'aaa_file1.txt').write_text('one')
@@ -1216,14 +1191,44 @@ class TestFileExplorer(unittest.TestCase):
                 time.sleep(0.3)
                 # Entries: ../, aaa_file1.txt, bbb_file2.txt, ccc_file3.txt
                 # Start at ../ (line 1), move down to line 2, then to line 3
-                nvim.send_keys('j')  # Move to aaa_file1.txt (line 2)
+                nvim.send_ctrl('k')  # Move to aaa_file1.txt (line 2)
                 time.sleep(0.2)
-                nvim.send_keys('j')  # Move to bbb_file2.txt (line 3)
+                nvim.send_ctrl('k')  # Move to bbb_file2.txt (line 3)
                 time.sleep(0.2)
                 # Test moving up and back down
-                nvim.send_keys('k')  # Move back to aaa_file1.txt (line 2)
+                nvim.send_ctrl('^')
                 time.sleep(0.2)
-                nvim.send_keys('j')  # Move back to bbb_file2.txt (line 3)
+                nvim.send_ctrl('k')
+                time.sleep(0.2)
+                # Open the file at current position (should be bbb_file2.txt)
+                nvim.send_keys('\n')
+                time.sleep(0.3)
+                grid = nvim.get_grid()
+                # Should have opened file2.txt
+                self.assertIn('two', grid, "Should show content from bbb_file2 after navigation")
+
+    def test_file_explorer_down_then_up(self):
+        """COMPREHENSIVE: Test navigation with arrow keys"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create multiple entries to navigate through (use naming to ensure order)
+            (Path(tmpdir) / 'aaa_file1.txt').write_text('one')
+            (Path(tmpdir) / 'bbb_file2.txt').write_text('two')
+            (Path(tmpdir) / 'ccc_file3.txt').write_text('three')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.1)
+                nvim.send_ctrl('o')
+                time.sleep(0.3)
+                # Entries: ../, aaa_file1.txt, bbb_file2.txt, ccc_file3.txt
+                # Start at ../ (line 1), move down to line 2, then to line 3
+                nvim.send_keys('\x1b[B')
+                time.sleep(0.2)
+                nvim.send_keys('\x1b[B')
+                time.sleep(0.2)
+                # Test moving up and back down
+                nvim.send_keys('\x1b[A')  # Up arrow - Move back to aaa_file1.txt (line 2)
+                time.sleep(0.2)
+                nvim.send_keys('\x1b[B')  # Down arrow - Move back to bbb_file2.txt (line 3)
                 time.sleep(0.2)
                 # Open the file at current position (should be bbb_file2.txt)
                 nvim.send_keys('\n')
@@ -1261,9 +1266,9 @@ class TestFileExplorer(unittest.TestCase):
                 # Navigate to parent_file.txt
                 # Entries after sorting: ../, subdir/ (dir first!), parent_file.txt
                 # We start at first entry (../), need to move down TWICE to get to parent_file.txt
-                nvim.send_keys('j')  # Move to subdir/
+                nvim.send_ctrl('k')  # Move to subdir/
                 time.sleep(0.1)
-                nvim.send_keys('j')  # Move to parent_file.txt
+                nvim.send_ctrl('k')  # Move to parent_file.txt
                 time.sleep(0.2)
                 # Open it
                 nvim.send_keys('\n')
@@ -1284,10 +1289,10 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.send_ctrl('o')
                 time.sleep(0.1)
                 # Navigate to the file (after ../)
-                nvim.send_keys('j')
+                nvim.send_ctrl('k')
                 time.sleep(0.05)
                 # Press 'r' to rename
-                nvim.send_keys('r')
+                nvim.send_ctrl('r')
                 time.sleep(0.1)
                 # Clear the default value (Ctrl+u) and type new name
                 nvim.send_ctrl('u')  # Clear line
@@ -1303,7 +1308,7 @@ class TestFileExplorer(unittest.TestCase):
                 self.assertEqual(new_file.read_text(), 'content', "Content should be preserved")
 
     def test_file_explorer_boundary_navigation(self):
-        """Test navigation boundaries (k at top, j at bottom)"""
+        """Test navigation boundaries (arrow keys at top/bottom)"""
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / 'file.txt').write_text('content')
             with NvimTerminal(self.config_dir) as nvim:
@@ -1315,18 +1320,18 @@ class TestFileExplorer(unittest.TestCase):
                 # Should start at first entry (../)
                 self.assertIn('> ../', grid, "Should start at first entry")
                 # Try to go up from first entry (should stay at first)
-                nvim.send_keys('k')
+                nvim.send_keys('\x1b[A')  # Up arrow
                 time.sleep(0.05)
                 grid = nvim.get_grid()
-                self.assertIn('> ../', grid, "Should stay at first entry when pressing k")
+                self.assertIn('> ../', grid, "Should stay at first entry when pressing up")
                 # Go to last entry
-                nvim.send_keys('j')  # Move to file.txt
+                nvim.send_keys('\x1b[B')  # Down arrow - Move to file.txt
                 time.sleep(0.05)
                 # Try to go down from last entry (should stay at last)
-                nvim.send_keys('j')
+                nvim.send_keys('\x1b[B')  # Down arrow
                 time.sleep(0.05)
                 grid = nvim.get_grid()
-                self.assertIn('> file.txt', grid, "Should stay at last entry when pressing j")
+                self.assertIn('> file.txt', grid, "Should stay at last entry when pressing down")
                 nvim.send_keys('\x1b')
                 time.sleep(0.05)
 
@@ -1345,9 +1350,9 @@ class TestFileExplorer(unittest.TestCase):
                 self.assertIn('empty_dir', grid, "Should show directory name")
                 self.assertIn('../', grid, "Should show parent entry")
                 # Try navigation (should not crash)
-                nvim.send_keys('j')
+                nvim.send_ctrl('k')
                 time.sleep(0.05)
-                nvim.send_keys('k')
+                nvim.send_keys('\x1b[A')
                 time.sleep(0.05)
                 nvim.send_keys('\x1b')
                 time.sleep(0.05)
@@ -1374,7 +1379,7 @@ class TestFileExplorer(unittest.TestCase):
                 # Invalid characters (parentheses) should show as X
                 self.assertIn('fileXwithXparens.txt', grid, "Should show file with parens as X")
                 # Try opening file with spaces (valid - should work)
-                nvim.send_keys('j')  # Move to first file
+                nvim.send_ctrl('k')  # Move to first file
                 time.sleep(0.05)
                 nvim.send_keys('\n')  # Open it
                 time.sleep(0.15)
@@ -1411,7 +1416,7 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.send_ctrl('o')
                 time.sleep(0.1)
                 # Try to create file with same name
-                nvim.send_keys('a')
+                nvim.send_ctrl('n')
                 time.sleep(0.1)
                 nvim.send_keys('existing.txt\n')
                 time.sleep(0.15)
@@ -1432,17 +1437,17 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.send_ctrl('o')
                 time.sleep(0.1)
                 # Create a file
-                nvim.send_keys('a')
+                nvim.send_ctrl('n')
                 time.sleep(0.1)
                 nvim.send_keys('first.txt\n')
                 time.sleep(0.15)
                 # Create another file
-                nvim.send_keys('a')
+                nvim.send_ctrl('n')
                 time.sleep(0.1)
                 nvim.send_keys('second.txt\n')
                 time.sleep(0.15)
                 # Create a directory
-                nvim.send_keys('A')
+                nvim.send_ctrl('f')
                 time.sleep(0.1)
                 nvim.send_keys('mydir\n')
                 time.sleep(0.15)
@@ -1484,7 +1489,7 @@ class TestFileExplorer(unittest.TestCase):
                 # Test closing with 'q'
                 nvim.send_ctrl('o')
                 time.sleep(0.1)
-                nvim.send_keys('q')
+                nvim.send_keys('\x1b')
                 time.sleep(0.1)
                 grid = nvim.get_grid()
                 # Should be closed (no file explorer visible)
@@ -1507,31 +1512,31 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.send_ctrl('o')
                 time.sleep(0.1)
                 # Create directory
-                nvim.send_keys('A')
+                nvim.send_ctrl('f')
                 time.sleep(0.1)
                 nvim.send_keys('original_dir\n')
                 time.sleep(0.15)
                 # Navigate to the directory and enter it
-                nvim.send_keys('j')  # Move to original_dir
+                nvim.send_ctrl('k')  # Move to original_dir
                 time.sleep(0.05)
                 nvim.send_keys('\n')  # Enter directory
                 time.sleep(0.15)
                 grid = nvim.get_grid()
                 self.assertIn('original_dir', grid, "Should be inside original_dir")
                 # Create a file inside
-                nvim.send_keys('a')
+                nvim.send_ctrl('n')
                 time.sleep(0.1)
                 nvim.send_keys('inner_file.txt\n')
                 time.sleep(0.15)
                 # Go back to parent
-                nvim.send_keys('h')  # Go up
+                nvim.send_keys('\x7f')  # Go up
                 time.sleep(0.15)
                 grid = nvim.get_grid()
                 self.assertIn('original_dir/', grid, "Should see original_dir as entry")
                 # Rename the directory
-                nvim.send_keys('j')  # Move to original_dir
+                nvim.send_ctrl('k')  # Move to original_dir
                 time.sleep(0.05)
-                nvim.send_keys('r')  # Rename
+                nvim.send_ctrl('r')  # Rename
                 time.sleep(0.1)
                 nvim.send_ctrl('u')  # Clear default value
                 time.sleep(0.05)
@@ -1556,14 +1561,14 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.send_ctrl('o')
                 time.sleep(0.1)
                 # Try to create file with slash (should be rejected)
-                nvim.send_keys('a')
+                nvim.send_ctrl('n')
                 time.sleep(0.1)
                 nvim.send_keys('bad/path.txt\n')
                 time.sleep(0.15)
                 # File should not be created
                 self.assertFalse((Path(tmpdir) / 'bad/path.txt').exists(), "File with slash should be rejected")
                 # Try to create file with special char @ (should be rejected)
-                nvim.send_keys('a')
+                nvim.send_ctrl('n')
                 time.sleep(0.1)
                 nvim.send_ctrl('u')
                 nvim.send_keys('bad@file.txt\n')
@@ -1582,18 +1587,18 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.send_ctrl('o')
                 time.sleep(0.1)
                 # Try to create file named "."
-                nvim.send_keys('a')
+                nvim.send_ctrl('n')
                 time.sleep(0.1)
                 nvim.send_keys('.\n')
                 time.sleep(0.15)
                 # Try to create file named ".."
-                nvim.send_keys('a')
+                nvim.send_ctrl('n')
                 time.sleep(0.1)
                 nvim.send_ctrl('u')
                 nvim.send_keys('..\n')
                 time.sleep(0.15)
                 # Try to create directory named "."
-                nvim.send_keys('A')
+                nvim.send_ctrl('f')
                 time.sleep(0.1)
                 nvim.send_ctrl('u')
                 nvim.send_keys('.\n')
@@ -1614,18 +1619,18 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.send_ctrl('o')
                 time.sleep(0.1)
                 # Create file with all valid characters including space
-                nvim.send_keys('a')
+                nvim.send_ctrl('n')
                 time.sleep(0.1)
                 nvim.send_keys('Valid File-123.txt\n')
                 time.sleep(0.15)
                 # Create hidden file (starts with dot)
-                nvim.send_keys('a')
+                nvim.send_ctrl('n')
                 time.sleep(0.1)
                 nvim.send_ctrl('u')
                 nvim.send_keys('.hidden-file_01.txt\n')
                 time.sleep(0.15)
                 # Create directory with valid name
-                nvim.send_keys('A')
+                nvim.send_ctrl('f')
                 time.sleep(0.1)
                 nvim.send_ctrl('u')
                 nvim.send_keys('Valid Dir-123\n')
@@ -1651,10 +1656,10 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.send_ctrl('o')
                 time.sleep(0.1)
                 # Navigate to file
-                nvim.send_keys('j')
+                nvim.send_ctrl('k')
                 time.sleep(0.05)
                 # Try to rename with invalid character (@)
-                nvim.send_keys('r')
+                nvim.send_ctrl('r')
                 time.sleep(0.1)
                 nvim.send_ctrl('u')
                 nvim.send_keys('bad@name.txt\n')
@@ -1663,7 +1668,7 @@ class TestFileExplorer(unittest.TestCase):
                 self.assertTrue(old_file.exists(), "Original file should still exist after invalid rename")
                 self.assertFalse((Path(tmpdir) / 'bad@name.txt').exists(), "File with invalid name should not exist")
                 # Try valid rename with space
-                nvim.send_keys('r')
+                nvim.send_ctrl('r')
                 time.sleep(0.1)
                 nvim.send_ctrl('u')
                 nvim.send_keys('good name.txt\n')
@@ -1705,29 +1710,46 @@ class TestFileExplorer(unittest.TestCase):
             good_file.write_text('should open')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
-                time.sleep(0.05)
-                nvim.send_ctrl('o')
                 time.sleep(0.1)
-                # Try to open the invalid file (it should be first after ../)
-                # Navigate to bad@file (shown as badXfile.txt)
-                nvim.send_keys('j')  # Move to first file
-                time.sleep(0.05)
-                # Check if it's the bad file by looking for X in grid
+                nvim.send_ctrl('o')
+                time.sleep(0.2)
                 grid = nvim.get_grid()
+                # Verify file-explorer is open
+                self.assertIn('../', grid, "File explorer should be open")
+                # Find and navigate to bad@file.txt (shown as badXfile.txt)
                 if 'badXfile' in grid:
+                    # Navigate to it
+                    nvim.send_ctrl('k')  # Move to first file
+                    time.sleep(0.15)
+                    grid = nvim.get_grid()
+                    # Verify we're on the bad file (selection marker '>')
                     # Try to open it
                     nvim.send_keys('\n')
-                    time.sleep(0.2)
+                    time.sleep(0.3)
                     # Should still be in file-explorer (not opened)
                     grid = nvim.get_grid()
                     self.assertIn('badXfile', grid, "Should still show file explorer after trying to open invalid file")
                     # Should NOT show the file content
                     self.assertNotIn('should not open', grid, "Should not open invalid file")
-                # Now try to open the valid file
-                nvim.send_keys('j')  # Move to next file (good_file.txt)
-                time.sleep(0.05)
-                nvim.send_keys('\n')  # Open it
+                    # Should show error message
+                    self.assertIn('Cannot open file', grid, "Should show error message")
+                # Now navigate to and open the valid file
+                # Close and reopen file-explorer to clear any state
+                nvim.send_keys('\x1b')
+                time.sleep(0.15)
+                nvim.send_ctrl('o')
                 time.sleep(0.2)
+                # Navigate to good_file.txt
+                nvim.send_ctrl('k')  # Move past ../
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                if 'badXfile' in grid:
+                    # We're on bad file, move to next
+                    nvim.send_ctrl('k')
+                    time.sleep(0.1)
+                # Now open the file
+                nvim.send_keys('\n')
+                time.sleep(0.3)
                 grid = nvim.get_grid()
                 # Should open successfully
                 self.assertIn('should open', grid, "Should open valid file")
@@ -1748,7 +1770,7 @@ class TestFileExplorer(unittest.TestCase):
                 # Directory should show with X
                 self.assertIn('badXdir/', grid, "Invalid directory should show with X")
                 # Try to enter it (should be blocked)
-                nvim.send_keys('j')  # Move to bad@dir
+                nvim.send_ctrl('k')  # Move to bad@dir
                 time.sleep(0.05)
                 nvim.send_keys('\n')  # Try to enter
                 time.sleep(0.2)
@@ -1800,7 +1822,7 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.send_ctrl('o')
                 time.sleep(0.1)
                 # Try to create file with / (path traversal attempt)
-                nvim.send_keys('a')
+                nvim.send_ctrl('n')
                 time.sleep(0.1)
                 nvim.send_keys('../escape.txt\n')
                 time.sleep(0.15)
@@ -1810,7 +1832,7 @@ class TestFileExplorer(unittest.TestCase):
                 self.assertFalse((Path(tmpdir) / '../escape.txt').exists(),
                                "Should not create file with path traversal")
                 # Try to create directory with / (path traversal attempt)
-                nvim.send_keys('A')
+                nvim.send_ctrl('f')
                 time.sleep(0.1)
                 nvim.send_ctrl('u')
                 nvim.send_keys('./baddir\n')
@@ -1834,7 +1856,7 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.send_ctrl('o')
                 time.sleep(0.1)
                 # Navigate into level1
-                nvim.send_keys('j')  # Move to level1
+                nvim.send_ctrl('k')  # Move to level1
                 time.sleep(0.05)
                 nvim.send_keys('\n')  # Enter
                 time.sleep(0.15)
@@ -1842,7 +1864,7 @@ class TestFileExplorer(unittest.TestCase):
                 self.assertIn('level1', grid, "Should be in level1")
                 self.assertIn('level2/', grid, "Should see level2")
                 # Navigate into level2
-                nvim.send_keys('j')  # Move to level2
+                nvim.send_ctrl('k')  # Move to level2
                 time.sleep(0.05)
                 nvim.send_keys('\n')  # Enter
                 time.sleep(0.15)
@@ -1850,7 +1872,7 @@ class TestFileExplorer(unittest.TestCase):
                 self.assertIn('level2', grid, "Should be in level2")
                 self.assertIn('level3/', grid, "Should see level3")
                 # Navigate back up (test go_up with valid path)
-                nvim.send_keys('h')  # Go up
+                nvim.send_keys('\x7f')  # Go up
                 time.sleep(0.15)
                 grid = nvim.get_grid()
                 self.assertIn('level1', grid, "Should be back in level1")
