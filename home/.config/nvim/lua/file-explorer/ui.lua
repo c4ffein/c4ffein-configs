@@ -39,10 +39,41 @@ local function get_directory_entries(dir)
   end)
   for _, item in ipairs(items) do
     local full_path = dir .. "/" .. item
-    local is_dir = vim.fn.isdirectory(full_path) == 1
     local is_symlink = vim.fn.getftype(full_path) == "link"
-    local display_name = is_dir and (item .. "/") or item
-    table.insert(entries, {name = display_name, is_dir = is_dir, is_symlink = is_symlink, path = full_path})
+    local is_dir = vim.fn.isdirectory(full_path) == 1
+    local symlink_target = nil
+    local display_name = item
+    if is_symlink then
+      -- Get symlink target (protect against redefined symlinks to other dirs)
+      -- NOTE: resolve() follows the entire chain to the final target
+      local ok, resolved = pcall(vim.fn.resolve, full_path)
+      if ok and resolved then
+        -- SECURITY: Validate symlink target (paranoid path validation)
+        local target_valid = operations.is_valid_path(resolved)
+        if target_valid then
+          symlink_target = resolved
+          -- Show as "name -> target"
+          display_name = item .. " -> " .. symlink_target
+        else
+          -- Invalid symlink target - don't store it, show as broken
+          display_name = item .. " -> [INVALID TARGET]"
+        end
+      else
+        -- Failed to resolve (circular symlink or other error)
+        display_name = item .. " -> [BROKEN LINK]"
+      end
+    else
+      -- Add trailing slash for directories
+      display_name = is_dir and (item .. "/") or item
+    end
+    table.insert(entries, {
+      name = display_name,
+      original_name = item,
+      is_dir = is_dir,
+      is_symlink = is_symlink,
+      symlink_target = symlink_target,
+      path = full_path
+    })
   end
   return entries
 end
@@ -57,6 +88,7 @@ local function update_display()
   vim.api.nvim_set_hl(0, "FileExplorerParent", {fg = "#777777"})  -- Grey for ../
   vim.api.nvim_set_hl(0, "FileExplorerDir", {fg = "#88EEFF"})  -- Cyan for directories
   vim.api.nvim_set_hl(0, "FileExplorerSymlink", {fg = "#88FFAA"})  -- Green for symlinks
+  vim.api.nvim_set_hl(0, "FileExplorerSymlinkChain", {fg = "#FF0000"})  -- Red for symlink chains
   vim.api.nvim_set_hl(0, "FileExplorerPath", {fg = "#BB88FF"})  -- Purple for path
   -- Update path window (top)
   local path_lines = {M.current_dir}
@@ -70,14 +102,14 @@ local function update_display()
   local file_lines = {}
   for i, entry in ipairs(M.entries) do
     local prefix = (i == M.selected_line) and "> " or "  "
-    -- Check if filename is valid (skip ../ as it's always allowed)
-    local is_valid = (entry.name == "../") or operations.is_valid_filename(entry.name:gsub("/$", ""))
+    -- Check if filename is valid (skip ../ as it's always allowed, symlinks display as-is)
+    local is_valid = entry.is_parent or entry.is_symlink or operations.is_valid_filename((entry.original_name or entry.name):gsub("/$", ""))
     entry.is_valid = is_valid
     if is_valid then
       table.insert(file_lines, prefix .. entry.name)
     else
       -- Show sanitized version with X for forbidden chars
-      local sanitized = operations.sanitize_for_display(entry.name:gsub("/$", ""))
+      local sanitized = operations.sanitize_for_display((entry.original_name or entry.name):gsub("/$", ""))
       if entry.is_dir then sanitized = sanitized .. "/" end
       table.insert(file_lines, prefix .. sanitized)
     end
@@ -169,9 +201,31 @@ end
 local function enter_selected()
   if M.selected_line < 1 or M.selected_line > #M.entries then return end
   local entry = M.entries[M.selected_line]
+  -- SECURITY: Block opening symlinks without valid targets (broken/circular/invalid)
+  if entry.is_symlink and not entry.symlink_target then
+    vim.notify("Cannot open symlink: Invalid or broken target", vim.log.levels.ERROR)
+    return
+  end
+  -- SECURITY: TOCTOU protection - verify symlink target hasn't changed
+  if entry.is_symlink and entry.symlink_target then
+    local current_target = vim.fn.resolve(entry.path)
+    if current_target ~= entry.symlink_target then
+      vim.notify("SECURITY: Symlink target changed!", vim.log.levels.ERROR)
+      return
+    end
+    -- SECURITY: Block symlink chains - check target is not itself a symlink
+    -- NOTE: There's a tiny TOCTOU window between this check and opening, but
+    -- the risk is minimal for this edge case and we're already being paranoid
+    local target_type = vim.fn.getftype(entry.symlink_target)
+    if target_type == "link" then
+      vim.notify("SECURITY: Symlink chains are not allowed", vim.log.levels.ERROR)
+      return
+    end
+  end
   -- SECURITY: Double-check validation before opening (defense in depth)
-  if entry.name ~= "../" then
-    local filename = entry.name:gsub("/$", "")
+  -- Skip validation for parent directory and symlinks (they show their targets)
+  if entry.name ~= "../" and not entry.is_parent and not entry.is_symlink then
+    local filename = (entry.original_name or entry.name):gsub("/$", "")
     local is_valid = operations.is_valid_filename(filename)
     if not is_valid then
       vim.notify("Cannot open file with invalid characters: " .. entry.name, vim.log.levels.ERROR)
@@ -179,20 +233,28 @@ local function enter_selected()
     end
   end
   if entry.is_dir then
+    -- SECURITY: Use stored symlink target if this is a symlink (verified above)
+    local target_path = entry.symlink_target or entry.path
     -- SECURITY: Validate path before navigating (defense in depth)
-    local path_valid = operations.is_valid_path(entry.path)
+    local path_valid = operations.is_valid_path(target_path)
     if not path_valid then
-      vim.notify("Cannot navigate to directory with invalid path: " .. entry.path, vim.log.levels.ERROR)
+      vim.notify("Cannot navigate to directory with invalid path: " .. target_path, vim.log.levels.ERROR)
       return
     end
-    -- Navigate into directory
-    M.current_dir = entry.path
+    M.current_dir = target_path
     M.selected_line = 1
     update_display()
   else
-    -- Open file
+    -- SECURITY: Use stored symlink target if this is a symlink (verified above)
+    local target_path = entry.symlink_target or entry.path
+    -- SECURITY: Validate file path before opening (defense in depth)
+    local path_valid = operations.is_valid_path(target_path)
+    if not path_valid then
+      vim.notify("Cannot open file with invalid path: " .. target_path, vim.log.levels.ERROR)
+      return
+    end
     M.close()
-    vim.cmd("edit " .. vim.fn.fnameescape(entry.path))
+    vim.cmd("edit " .. vim.fn.fnameescape(target_path))
   end
 end
 
@@ -239,8 +301,10 @@ end
 local function delete_selected()
   if M.selected_line < 1 or M.selected_line > #M.entries then return end
   local entry = M.entries[M.selected_line]
-  if entry.name == "../" then return end  -- Can't delete parent dir entry
-  vim.ui.input({prompt = "Delete " .. entry.name .. "? (y/N): "}, function(confirm)
+  if entry.name == "../" or entry.is_parent then return end  -- Can't delete parent dir entry
+  -- Use original_name or name for display in prompt
+  local display_name = entry.original_name or entry.name
+  vim.ui.input({prompt = "Delete " .. display_name .. "? (y/N): "}, function(confirm)
     if confirm and confirm:lower() == "y" then
       local success, err = operations.delete_path(entry.path)
       if success then
@@ -256,8 +320,10 @@ end
 local function rename_selected()
   if M.selected_line < 1 or M.selected_line > #M.entries then return end
   local entry = M.entries[M.selected_line]
-  if entry.name == "../" then return end  -- Can't rename parent dir entry
-  vim.ui.input({prompt = "Rename to: ", default = entry.name:gsub("/$", "")}, function(new_name)
+  if entry.name == "../" or entry.is_parent then return end  -- Can't rename parent dir entry
+  -- Use original_name for symlinks (to avoid " -> target" suffix in default)
+  local default_name = (entry.original_name or entry.name):gsub("/$", "")
+  vim.ui.input({prompt = "Rename to: ", default = default_name}, function(new_name)
     if not new_name or new_name == "" then return end
     local success, err = operations.rename_path(entry.path, new_name)
     if success then

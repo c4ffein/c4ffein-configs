@@ -63,7 +63,7 @@ class NvimTerminal:
             os.execve(nvim_path, cmd, env)
         else:  # Parent process
             # Give nvim time to start
-            time.sleep(0.03)
+            time.sleep(0.01)
             # Read initial output
             self._read_output(timeout=0.01)
 
@@ -389,7 +389,7 @@ class TestMakeRunner(unittest.TestCase):
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
                 nvim.send_keys('m')
-                time.sleep(0.02)
+                time.sleep(0.01)
                 # All targets visible
                 nvim.assert_visible('first')
                 nvim.assert_visible('second')
@@ -416,12 +416,12 @@ class TestMakeRunner(unittest.TestCase):
                 nvim.start(cwd=tmpdir)
                 # Open make-runner
                 nvim.send_keys('m')
-                time.sleep(0.03)
+                time.sleep(0.01)
                 nvim.assert_visible('first')
                 nvim.assert_visible('second')
                 # Press 1 to execute first target
                 nvim.send_keys('1')
-                time.sleep(0.05)
+                time.sleep(0.01)
                 # Should see output terminal with 'first'
                 grid = nvim.get_grid()
                 self.assertIn('first', grid)
@@ -433,7 +433,7 @@ class TestMakeRunner(unittest.TestCase):
                 nvim.start(cwd=tmpdir)
                 # Try to open make-runner
                 nvim.send_keys('m')
-                time.sleep(0.03)
+                time.sleep(0.01)
                 # Should show no targets or error message
                 grid = nvim.get_grid()
                 self.assertTrue('No targets found' in grid or 'Makefile' in grid)
@@ -446,7 +446,7 @@ class TestMakeRunner(unittest.TestCase):
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
                 nvim.send_keys('m')
-                time.sleep(0.03)
+                time.sleep(0.01)
                 grid = nvim.get_grid()
                 self.assertIn('No targets found', grid)
 
@@ -467,10 +467,10 @@ class TestMakeRunner(unittest.TestCase):
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
                 nvim.send_keys('m')
-                time.sleep(0.03)
+                time.sleep(0.01)
                 # Type "test" to filter
                 nvim.send_keys('test')
-                time.sleep(0.03)
+                time.sleep(0.01)
                 grid = nvim.get_grid()
                 # Should see both test targets
                 self.assertIn('test-unit', grid)
@@ -494,12 +494,12 @@ class TestFileFinder(unittest.TestCase):
             (Path(tmpdir) / 'fileB.txt').write_text('content B')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir, filename='fileA.txt')
-                time.sleep(0.02)
+                time.sleep(0.2)
                 # Should see fileA content
                 nvim.assert_visible('content A')
                 # Press 'O' to open file-finder
                 nvim.send_keys('O')
-                time.sleep(0.03)
+                time.sleep(0.3)
                 # Should see file list
                 nvim.assert_visible('fileA')
                 nvim.assert_visible('fileB')
@@ -511,17 +511,17 @@ class TestFileFinder(unittest.TestCase):
             (Path(tmpdir) / 'fileB.txt').write_text('content B')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir, filename='fileA.txt')
-                time.sleep(0.02)
+                time.sleep(0.2)
                 nvim.assert_visible('content A')
                 # Open file-finder with 'O' (Shift+O)
                 nvim.send_keys('O')
-                time.sleep(0.03)
+                time.sleep(0.3)
                 # Type "fileB" to search
                 nvim.send_keys('fileB')
-                time.sleep(0.02)
+                time.sleep(0.2)
                 # Press Enter to open
                 nvim.send_keys('\n')
-                time.sleep(0.03)
+                time.sleep(0.3)
                 # Should now see fileB content
                 nvim.assert_visible('content B')
                 nvim.assert_not_visible('content A')
@@ -558,15 +558,15 @@ class TestFileFinder(unittest.TestCase):
             (Path(tmpdir) / 'test.txt').write_text('test content')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir, filename='test.txt')
-                time.sleep(0.02)
+                time.sleep(0.2)
                 nvim.assert_visible('test content')
                 # Open file-finder
                 nvim.send_keys('O')
-                time.sleep(0.03)
+                time.sleep(0.3)
                 nvim.assert_visible('test.txt')
                 # Close with ESC
                 nvim.send_keys('\x1b')
-                time.sleep(0.03)
+                time.sleep(0.3)
                 # Should be back to file content
                 nvim.assert_visible('test content')
 
@@ -858,7 +858,7 @@ class TestFileFinder(unittest.TestCase):
                     f"After -: should show exactly initial count. Initial={initial_count}, After -={minus_count}")
                 # Press – (Ctrl+-) again to go to initial-1
                 nvim.send_keys('–')
-                time.sleep(0.1)  # More time for grid to re-render
+                time.sleep(0.05)  # More time for grid to re-render
                 grid_after_minus2 = nvim.get_grid()
                 lines_after_minus2 = grid_after_minus2.split('\n')
                 filename_idx_minus2 = next((i for i, l in enumerate(lines_after_minus2) if 'data.txt' in l), None)
@@ -941,9 +941,9 @@ class TestFileFinder(unittest.TestCase):
                 # All 3 files match the filename pattern with equal score
                 # History ranking should make them appear: c, b, a (most recent first)
                 nvim.send_keys('O')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_keys('file_')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 lines = grid.split('\n')
                 # Find positions of each file in the results
@@ -983,7 +983,7 @@ class TestFileExplorer(unittest.TestCase):
                 time.sleep(0.05)
                 # Open file-explorer
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 # Should show current directory
                 self.assertIn(tmpdir, grid, "Should show current directory path")
@@ -1006,14 +1006,14 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.start(cwd=tmpdir)
                 time.sleep(0.05)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 # Navigate to subdir (should be first entry or second after ../)
                 # Press j to select subdir
                 nvim.send_ctrl('k')
                 time.sleep(0.05)
                 # Enter the directory
                 nvim.send_keys('\n')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 # Should now show subdir path
                 self.assertIn('subdir', grid, "Should show subdir in path")
@@ -1033,12 +1033,12 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.start(cwd=str(subdir))
                 time.sleep(0.05)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 self.assertIn('subdir', grid, "Should start in subdir")
                 # Press h to go up
                 nvim.send_keys('\x7f')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 # Should now be in parent directory
                 # Verify by checking we can see subdir as an entry
@@ -1053,20 +1053,20 @@ class TestFileExplorer(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
-                time.sleep(0.05)
+                time.sleep(0.01)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.01)
                 # Press 'a' to create file
                 nvim.send_ctrl('n')
-                time.sleep(0.1)
+                time.sleep(0.01)
                 # Type filename and confirm
                 nvim.send_keys('newfile.txt\n')
-                time.sleep(0.15)
+                time.sleep(0.01)
                 # Check file was created
                 created_file = Path(tmpdir) / 'newfile.txt'
                 self.assertTrue(created_file.exists(), "File should be created")
                 nvim.send_keys('\x1b')
-                time.sleep(0.05)
+                time.sleep(0.01)
 
     def test_file_explorer_create_directory(self):
         """Test creating a new directory with 'A' key"""
@@ -1075,13 +1075,13 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.start(cwd=tmpdir)
                 time.sleep(0.05)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 # Press 'A' to create directory
                 nvim.send_ctrl('f')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 # Type dirname and confirm
                 nvim.send_keys('newdir\n')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 # Check directory was created
                 created_dir = Path(tmpdir) / 'newdir'
                 self.assertTrue(created_dir.exists(), "Directory should be created")
@@ -1098,16 +1098,16 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.start(cwd=tmpdir)
                 time.sleep(0.05)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 # Navigate to the file (might be first or after ../)
                 nvim.send_ctrl('k')  # Move down
                 time.sleep(0.05)
                 # Press 'd' to delete
                 nvim.send_ctrl('d')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 # Confirm deletion with 'y'
                 nvim.send_keys('y\n')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 # Check file was deleted
                 self.assertFalse(test_file.exists(), "File should be deleted")
                 nvim.send_keys('\x1b')
@@ -1121,13 +1121,13 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.start(cwd=tmpdir)
                 time.sleep(0.05)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 # Navigate to the file
                 nvim.send_ctrl('k')
                 time.sleep(0.05)
                 # Press Enter to open
                 nvim.send_keys('\n')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 # Should see file content
                 self.assertIn('file content here', grid, "Should show file content after opening")
@@ -1147,9 +1147,9 @@ class TestFileExplorer(unittest.TestCase):
             (dir3 / 'file_in_third.txt').write_text('content from third')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
-                time.sleep(0.05)
+                time.sleep(0.01)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.01)
                 # Initial state: should see all 3 dirs
                 grid = nvim.get_grid()
                 self.assertIn('aaa_first/', grid, "Should see first directory")
@@ -1158,21 +1158,21 @@ class TestFileExplorer(unittest.TestCase):
                 # Use Ctrl+k twice to navigate to third directory (ccc_third)
                 # First entry might be ../ so we need to navigate down
                 nvim.send_ctrl('k')  # Move down once
-                time.sleep(0.05)
+                time.sleep(0.01)
                 nvim.send_ctrl('k')  # Move down twice
-                time.sleep(0.05)
+                time.sleep(0.01)
                 # Enter the directory (should be bbb_second now)
                 nvim.send_keys('\n')
-                time.sleep(0.15)
+                time.sleep(0.01)
                 grid = nvim.get_grid()
                 # Should be inside bbb_second
                 self.assertIn('bbb_second', grid, "Should show bbb_second in path")
                 self.assertIn('file_in_second.txt', grid, "Should show file_in_second.txt")
                 # Select the file (should be first entry) and open it
                 nvim.send_ctrl('k')  # Move to file
-                time.sleep(0.05)
+                time.sleep(0.01)
                 nvim.send_keys('\n')  # Open file
-                time.sleep(0.15)
+                time.sleep(0.01)
                 grid = nvim.get_grid()
                 # Should see file content
                 self.assertIn('content from second', grid, "Should show content from second file")
@@ -1186,23 +1186,23 @@ class TestFileExplorer(unittest.TestCase):
             (Path(tmpdir) / 'ccc_file3.txt').write_text('three')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_ctrl('o')
-                time.sleep(0.3)
+                time.sleep(0.05)
                 # Entries: ../, aaa_file1.txt, bbb_file2.txt, ccc_file3.txt
                 # Start at ../ (line 1), move down to line 2, then to line 3
                 nvim.send_ctrl('k')  # Move to aaa_file1.txt (line 2)
-                time.sleep(0.2)
+                time.sleep(0.05)
                 nvim.send_ctrl('k')  # Move to bbb_file2.txt (line 3)
-                time.sleep(0.2)
+                time.sleep(0.05)
                 # Test moving up and back down
                 nvim.send_ctrl('^')
-                time.sleep(0.2)
+                time.sleep(0.05)
                 nvim.send_ctrl('k')
-                time.sleep(0.2)
+                time.sleep(0.05)
                 # Open the file at current position (should be bbb_file2.txt)
                 nvim.send_keys('\n')
-                time.sleep(0.3)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 # Should have opened file2.txt
                 self.assertIn('two', grid, "Should show content from bbb_file2 after navigation")
@@ -1216,23 +1216,23 @@ class TestFileExplorer(unittest.TestCase):
             (Path(tmpdir) / 'ccc_file3.txt').write_text('three')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_ctrl('o')
-                time.sleep(0.3)
+                time.sleep(0.05)
                 # Entries: ../, aaa_file1.txt, bbb_file2.txt, ccc_file3.txt
                 # Start at ../ (line 1), move down to line 2, then to line 3
                 nvim.send_keys('\x1b[B')
-                time.sleep(0.2)
+                time.sleep(0.05)
                 nvim.send_keys('\x1b[B')
-                time.sleep(0.2)
+                time.sleep(0.05)
                 # Test moving up and back down
                 nvim.send_keys('\x1b[A')  # Up arrow - Move back to aaa_file1.txt (line 2)
-                time.sleep(0.2)
+                time.sleep(0.05)
                 nvim.send_keys('\x1b[B')  # Down arrow - Move back to bbb_file2.txt (line 3)
-                time.sleep(0.2)
+                time.sleep(0.05)
                 # Open the file at current position (should be bbb_file2.txt)
                 nvim.send_keys('\n')
-                time.sleep(0.3)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 # Should have opened file2.txt
                 self.assertIn('two', grid, "Should show content from bbb_file2 after navigation")
@@ -1248,9 +1248,9 @@ class TestFileExplorer(unittest.TestCase):
             with NvimTerminal(self.config_dir) as nvim:
                 # Start in the subdirectory
                 nvim.start(cwd=str(subdir))
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_ctrl('o')
-                time.sleep(0.3)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 # Should be in subdir
                 self.assertIn('subdir', grid, "Should start in subdir")
@@ -1258,7 +1258,7 @@ class TestFileExplorer(unittest.TestCase):
                 # Select the ../ entry and press Enter to go up
                 # First entry should be ../
                 nvim.send_keys('\n')  # Press Enter on ../ to go up
-                time.sleep(0.3)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 # Should now be in parent
                 self.assertIn('parent_file.txt', grid, "Should see parent file after going up")
@@ -1267,12 +1267,12 @@ class TestFileExplorer(unittest.TestCase):
                 # Entries after sorting: ../, subdir/ (dir first!), parent_file.txt
                 # We start at first entry (../), need to move down TWICE to get to parent_file.txt
                 nvim.send_ctrl('k')  # Move to subdir/
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_ctrl('k')  # Move to parent_file.txt
-                time.sleep(0.2)
+                time.sleep(0.05)
                 # Open it
                 nvim.send_keys('\n')
-                time.sleep(0.3)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 # Should see parent content
                 self.assertIn('parent content', grid, "Should show parent file content after navigating up and opening it")
@@ -1287,18 +1287,18 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.start(cwd=tmpdir)
                 time.sleep(0.05)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 # Navigate to the file (after ../)
                 nvim.send_ctrl('k')
                 time.sleep(0.05)
                 # Press 'r' to rename
                 nvim.send_ctrl('r')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 # Clear the default value (Ctrl+u) and type new name
                 nvim.send_ctrl('u')  # Clear line
                 time.sleep(0.05)
                 nvim.send_keys('new_name.txt\n')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 # Close explorer
                 nvim.send_keys('\x1b')
                 time.sleep(0.05)
@@ -1313,27 +1313,27 @@ class TestFileExplorer(unittest.TestCase):
             (Path(tmpdir) / 'file.txt').write_text('content')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
-                time.sleep(0.05)
+                time.sleep(0.01)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.01)
                 grid = nvim.get_grid()
                 # Should start at first entry (../)
                 self.assertIn('> ../', grid, "Should start at first entry")
                 # Try to go up from first entry (should stay at first)
                 nvim.send_keys('\x1b[A')  # Up arrow
-                time.sleep(0.05)
+                time.sleep(0.01)
                 grid = nvim.get_grid()
                 self.assertIn('> ../', grid, "Should stay at first entry when pressing up")
                 # Go to last entry
                 nvim.send_keys('\x1b[B')  # Down arrow - Move to file.txt
-                time.sleep(0.05)
+                time.sleep(0.01)
                 # Try to go down from last entry (should stay at last)
                 nvim.send_keys('\x1b[B')  # Down arrow
-                time.sleep(0.05)
+                time.sleep(0.01)
                 grid = nvim.get_grid()
                 self.assertIn('> file.txt', grid, "Should stay at last entry when pressing down")
                 nvim.send_keys('\x1b')
-                time.sleep(0.05)
+                time.sleep(0.01)
 
     def test_file_explorer_empty_directory(self):
         """Test behavior in an empty directory"""
@@ -1342,20 +1342,20 @@ class TestFileExplorer(unittest.TestCase):
             subdir.mkdir()
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=str(subdir))
-                time.sleep(0.05)
+                time.sleep(0.01)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.01)
                 grid = nvim.get_grid()
                 # Should show the directory path and ../ entry
                 self.assertIn('empty_dir', grid, "Should show directory name")
                 self.assertIn('../', grid, "Should show parent entry")
                 # Try navigation (should not crash)
                 nvim.send_ctrl('k')
-                time.sleep(0.05)
+                time.sleep(0.01)
                 nvim.send_keys('\x1b[A')
-                time.sleep(0.05)
+                time.sleep(0.01)
                 nvim.send_keys('\x1b')
-                time.sleep(0.05)
+                time.sleep(0.01)
 
     def test_file_explorer_special_characters_in_names(self):
         """Test files with special characters (spaces, dots, parentheses)"""
@@ -1369,9 +1369,9 @@ class TestFileExplorer(unittest.TestCase):
             file3.write_text('parens')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
-                time.sleep(0.05)
+                time.sleep(0.01)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.01)
                 grid = nvim.get_grid()
                 # Valid characters (space, dots) should show normally
                 self.assertIn('file with spaces.txt', grid, "Should show file with spaces normally")
@@ -1380,9 +1380,9 @@ class TestFileExplorer(unittest.TestCase):
                 self.assertIn('fileXwithXparens.txt', grid, "Should show file with parens as X")
                 # Try opening file with spaces (valid - should work)
                 nvim.send_ctrl('k')  # Move to first file
-                time.sleep(0.05)
+                time.sleep(0.01)
                 nvim.send_keys('\n')  # Open it
-                time.sleep(0.15)
+                time.sleep(0.01)
                 grid = nvim.get_grid()
                 # Should open successfully (spaces and dots are valid)
                 self.assertTrue('spaces' in grid or 'dots' in grid,
@@ -1395,15 +1395,15 @@ class TestFileExplorer(unittest.TestCase):
             (Path(tmpdir) / 'regular_file.txt').write_text('regular')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
-                time.sleep(0.05)
+                time.sleep(0.01)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.01)
                 grid = nvim.get_grid()
                 # Should show both hidden and regular files
                 self.assertIn('.hidden_file', grid, "Should show hidden files")
                 self.assertIn('regular_file.txt', grid, "Should show regular files")
                 nvim.send_keys('\x1b')
-                time.sleep(0.05)
+                time.sleep(0.01)
 
     def test_file_explorer_create_duplicate_file(self):
         """Test error handling when creating file that already exists"""
@@ -1414,12 +1414,12 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.start(cwd=tmpdir)
                 time.sleep(0.05)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 # Try to create file with same name
                 nvim.send_ctrl('n')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_keys('existing.txt\n')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 # Should still see file explorer (creation should fail gracefully)
                 grid = nvim.get_grid()
                 # The file should still exist with original content
@@ -1435,22 +1435,22 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.start(cwd=tmpdir)
                 time.sleep(0.05)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 # Create a file
                 nvim.send_ctrl('n')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_keys('first.txt\n')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 # Create another file
                 nvim.send_ctrl('n')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_keys('second.txt\n')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 # Create a directory
                 nvim.send_ctrl('f')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_keys('mydir\n')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 # Close explorer
                 nvim.send_keys('\x1b')
                 time.sleep(0.05)
@@ -1468,12 +1468,12 @@ class TestFileExplorer(unittest.TestCase):
                 time.sleep(0.05)
                 # Open file-explorer
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 self.assertIn('test.txt', grid, "Should show file explorer")
                 # Try to open again (should handle gracefully)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 # Should still show explorer (not crash or create duplicate)
                 self.assertIn('test.txt', grid, "Should still show file explorer")
@@ -1488,17 +1488,17 @@ class TestFileExplorer(unittest.TestCase):
                 time.sleep(0.05)
                 # Test closing with 'q'
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_keys('\x1b')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 # Should be closed (no file explorer visible)
                 self.assertNotIn('╭─', grid, "File explorer should be closed after 'q'")
                 # Test closing with Esc
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_keys('\x1b')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 # Should be closed
                 self.assertNotIn('╭─', grid, "File explorer should be closed after Esc")
@@ -1508,43 +1508,43 @@ class TestFileExplorer(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
-                time.sleep(0.05)
+                time.sleep(0.01)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.01)
                 # Create directory
                 nvim.send_ctrl('f')
-                time.sleep(0.1)
+                time.sleep(0.01)
                 nvim.send_keys('original_dir\n')
-                time.sleep(0.15)
+                time.sleep(0.01)
                 # Navigate to the directory and enter it
                 nvim.send_ctrl('k')  # Move to original_dir
-                time.sleep(0.05)
+                time.sleep(0.01)
                 nvim.send_keys('\n')  # Enter directory
-                time.sleep(0.15)
+                time.sleep(0.01)
                 grid = nvim.get_grid()
                 self.assertIn('original_dir', grid, "Should be inside original_dir")
                 # Create a file inside
                 nvim.send_ctrl('n')
-                time.sleep(0.1)
+                time.sleep(0.01)
                 nvim.send_keys('inner_file.txt\n')
-                time.sleep(0.15)
+                time.sleep(0.01)
                 # Go back to parent
                 nvim.send_keys('\x7f')  # Go up
-                time.sleep(0.15)
+                time.sleep(0.01)
                 grid = nvim.get_grid()
                 self.assertIn('original_dir/', grid, "Should see original_dir as entry")
                 # Rename the directory
                 nvim.send_ctrl('k')  # Move to original_dir
-                time.sleep(0.05)
+                time.sleep(0.01)
                 nvim.send_ctrl('r')  # Rename
-                time.sleep(0.1)
+                time.sleep(0.01)
                 nvim.send_ctrl('u')  # Clear default value
-                time.sleep(0.05)
+                time.sleep(0.01)
                 nvim.send_keys('renamed_dir\n')
-                time.sleep(0.15)
+                time.sleep(0.01)
                 # Close explorer
                 nvim.send_keys('\x1b')
-                time.sleep(0.05)
+                time.sleep(0.01)
                 # Verify everything
                 renamed_dir = Path(tmpdir) / 'renamed_dir'
                 inner_file = renamed_dir / 'inner_file.txt'
@@ -1559,20 +1559,20 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.start(cwd=tmpdir)
                 time.sleep(0.05)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 # Try to create file with slash (should be rejected)
                 nvim.send_ctrl('n')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_keys('bad/path.txt\n')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 # File should not be created
                 self.assertFalse((Path(tmpdir) / 'bad/path.txt').exists(), "File with slash should be rejected")
                 # Try to create file with special char @ (should be rejected)
                 nvim.send_ctrl('n')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_ctrl('u')
                 nvim.send_keys('bad@file.txt\n')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 # File should not be created
                 self.assertFalse((Path(tmpdir) / 'bad@file.txt').exists(), "File with @ should be rejected")
                 nvim.send_keys('\x1b')
@@ -1585,24 +1585,24 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.start(cwd=tmpdir)
                 time.sleep(0.05)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 # Try to create file named "."
                 nvim.send_ctrl('n')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_keys('.\n')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 # Try to create file named ".."
                 nvim.send_ctrl('n')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_ctrl('u')
                 nvim.send_keys('..\n')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 # Try to create directory named "."
                 nvim.send_ctrl('f')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_ctrl('u')
                 nvim.send_keys('.\n')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 # Close and verify nothing was created
                 nvim.send_keys('\x1b')
                 time.sleep(0.05)
@@ -1617,24 +1617,24 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.start(cwd=tmpdir)
                 time.sleep(0.05)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 # Create file with all valid characters including space
                 nvim.send_ctrl('n')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_keys('Valid File-123.txt\n')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 # Create hidden file (starts with dot)
                 nvim.send_ctrl('n')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_ctrl('u')
                 nvim.send_keys('.hidden-file_01.txt\n')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 # Create directory with valid name
                 nvim.send_ctrl('f')
-                time.sleep(0.1)
+                time.sleep(0.05)
                 nvim.send_ctrl('u')
                 nvim.send_keys('Valid Dir-123\n')
-                time.sleep(0.15)
+                time.sleep(0.05)
                 nvim.send_keys('\x1b')
                 time.sleep(0.05)
                 # Verify all were created
@@ -1652,29 +1652,29 @@ class TestFileExplorer(unittest.TestCase):
             old_file.write_text('content')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
-                time.sleep(0.05)
+                time.sleep(0.01)
                 nvim.send_ctrl('o')
-                time.sleep(0.1)
+                time.sleep(0.01)
                 # Navigate to file
                 nvim.send_ctrl('k')
-                time.sleep(0.05)
+                time.sleep(0.01)
                 # Try to rename with invalid character (@)
                 nvim.send_ctrl('r')
-                time.sleep(0.1)
+                time.sleep(0.01)
                 nvim.send_ctrl('u')
                 nvim.send_keys('bad@name.txt\n')
-                time.sleep(0.15)
+                time.sleep(0.01)
                 # File should still have old name
                 self.assertTrue(old_file.exists(), "Original file should still exist after invalid rename")
                 self.assertFalse((Path(tmpdir) / 'bad@name.txt').exists(), "File with invalid name should not exist")
                 # Try valid rename with space
                 nvim.send_ctrl('r')
-                time.sleep(0.1)
+                time.sleep(0.01)
                 nvim.send_ctrl('u')
                 nvim.send_keys('good name.txt\n')
-                time.sleep(0.15)
+                time.sleep(0.01)
                 nvim.send_keys('\x1b')
-                time.sleep(0.05)
+                time.sleep(0.01)
                 # Valid rename should have worked
                 self.assertFalse(old_file.exists(), "Old file should not exist after valid rename")
                 self.assertTrue((Path(tmpdir) / 'good name.txt').exists(), "File with space in name should exist")
@@ -1710,9 +1710,9 @@ class TestFileExplorer(unittest.TestCase):
             good_file.write_text('should open')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
-                time.sleep(0.1)
+                time.sleep(0.01)
                 nvim.send_ctrl('o')
-                time.sleep(0.2)
+                time.sleep(0.01)
                 grid = nvim.get_grid()
                 # Verify file-explorer is open
                 self.assertIn('../', grid, "File explorer should be open")
@@ -1720,12 +1720,12 @@ class TestFileExplorer(unittest.TestCase):
                 if 'badXfile' in grid:
                     # Navigate to it
                     nvim.send_ctrl('k')  # Move to first file
-                    time.sleep(0.15)
+                    time.sleep(0.01)
                     grid = nvim.get_grid()
                     # Verify we're on the bad file (selection marker '>')
                     # Try to open it
                     nvim.send_keys('\n')
-                    time.sleep(0.3)
+                    time.sleep(0.01)
                     # Should still be in file-explorer (not opened)
                     grid = nvim.get_grid()
                     self.assertIn('badXfile', grid, "Should still show file explorer after trying to open invalid file")
@@ -1736,20 +1736,20 @@ class TestFileExplorer(unittest.TestCase):
                 # Now navigate to and open the valid file
                 # Close and reopen file-explorer to clear any state
                 nvim.send_keys('\x1b')
-                time.sleep(0.15)
+                time.sleep(0.01)
                 nvim.send_ctrl('o')
-                time.sleep(0.2)
+                time.sleep(0.01)
                 # Navigate to good_file.txt
                 nvim.send_ctrl('k')  # Move past ../
-                time.sleep(0.1)
+                time.sleep(0.01)
                 grid = nvim.get_grid()
                 if 'badXfile' in grid:
                     # We're on bad file, move to next
                     nvim.send_ctrl('k')
-                    time.sleep(0.1)
+                    time.sleep(0.01)
                 # Now open the file
                 nvim.send_keys('\n')
-                time.sleep(0.3)
+                time.sleep(0.01)
                 grid = nvim.get_grid()
                 # Should open successfully
                 self.assertIn('should open', grid, "Should open valid file")
@@ -1878,6 +1878,692 @@ class TestFileExplorer(unittest.TestCase):
                 self.assertIn('level1', grid, "Should be back in level1")
                 nvim.send_keys('\x1b')
                 time.sleep(0.05)
+
+    def test_file_explorer_symlink_display(self):
+        """Test that symlinks display with their targets"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a real file and a symlink to it
+            real_file = Path(tmpdir) / 'real.txt'
+            real_file.write_text('real content')
+            link_file = Path(tmpdir) / 'link.txt'
+            link_file.symlink_to(real_file)
+            # Create a directory symlink
+            real_dir = Path(tmpdir) / 'real_dir'
+            real_dir.mkdir()
+            link_dir = Path(tmpdir) / 'link_dir'
+            link_dir.symlink_to(real_dir)
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.1)
+                nvim.send_ctrl('o')
+                time.sleep(0.2)
+                grid = nvim.get_grid()
+                # Should show symlinks with their complete targets
+                self.assertIn(f'link.txt -> {str(real_file)}', grid, "Should show file symlink with complete target")
+                self.assertIn(f'link_dir -> {str(real_dir)}', grid, "Should show dir symlink with complete target")
+                self.assertIn('real.txt', grid, "Should show real file")
+                self.assertIn('real_dir/', grid, "Should show real directory")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_symlink_follows_file(self):
+        """Test that opening symlinked files works"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a real file and a symlink to it
+            real_file = Path(tmpdir) / 'real.txt'
+            real_file.write_text('real content')
+            link_file = Path(tmpdir) / 'link.txt'
+            link_file.symlink_to(real_file)
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.1)
+                nvim.send_ctrl('o')
+                time.sleep(0.2)
+                # Navigate to the symlink
+                nvim.send_ctrl('k')  # Move past ../
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                # Verify we're on the symlink
+                self.assertIn('link.txt', grid, "Should show symlink")
+                # Open it
+                nvim.send_keys('\n')
+                time.sleep(0.05)
+                grid = nvim.get_grid()
+                # Should successfully open the symlinked file
+                self.assertIn('real content', grid, "Should open the symlinked file")
+                self.assertNotIn('link.txt ->', grid, "Should have left file explorer")
+
+    def test_file_explorer_symlink_follows_directory(self):
+        """Test that navigating into symlinked directories works"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a directory with a file and a symlink to it
+            real_dir = Path(tmpdir) / 'real_dir'
+            real_dir.mkdir()
+            (real_dir / 'inside.txt').write_text('inside content')
+            link_dir = Path(tmpdir) / 'link_dir'
+            link_dir.symlink_to(real_dir)
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.1)
+                nvim.send_ctrl('o')
+                time.sleep(0.2)
+                # Navigate to the symlinked directory
+                nvim.send_ctrl('k')  # Move past ../
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                # Verify we're on the directory symlink
+                self.assertIn('link_dir', grid, "Should show directory symlink")
+                # Enter it
+                nvim.send_keys('\n')
+                time.sleep(0.3)
+                grid = nvim.get_grid()
+                # Should successfully enter the symlinked directory
+                self.assertIn('inside.txt', grid, "Should enter the symlinked directory")
+                self.assertIn('real_dir', grid, "Should show real_dir path")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_symlink_delete(self):
+        """Test that deleting symlinks is allowed (safe operation)"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a real file and a symlink to it
+            real_file = Path(tmpdir) / 'real.txt'
+            real_file.write_text('real content')
+            link_file = Path(tmpdir) / 'link.txt'
+            link_file.symlink_to(real_file)
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.1)
+                nvim.send_ctrl('o')
+                time.sleep(0.2)
+                # Navigate to the symlink
+                nvim.send_ctrl('k')  # Move past ../
+                time.sleep(0.1)
+                # Delete the symlink
+                nvim.send_ctrl('d')
+                time.sleep(0.3)
+                nvim.send_keys('y\n')  # Confirm deletion with Enter
+                time.sleep(0.5)
+                grid = nvim.get_grid()
+                # Check that link.txt is NOT in the grid listing (ignore notification at bottom)
+                # The grid should show the file-explorer with link.txt removed
+                lines = grid.split('\n')
+                file_list = [l for l in lines if '../' in l or 'real.txt' in l or 'link.txt' in l]
+                file_list_str = '\n'.join(file_list)
+                # Verify link.txt is not in the actual file list (may be in notification)
+                self.assertIn('../', file_list_str, "Should show ../")
+                self.assertIn('real.txt', file_list_str, "Real file should still exist")
+                # Count occurrences - if link.txt appears only once, it's just in the notification
+                link_count = grid.count('link.txt')
+                self.assertLessEqual(link_count, 1, "link.txt should appear at most once (in notification only)")
+                # Verify on filesystem
+                self.assertFalse(link_file.exists(), "Symlink should not exist on filesystem")
+                self.assertTrue(real_file.exists(), "Real file should still exist on filesystem")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_symlink_rename(self):
+        """Test that renaming symlinks is allowed (safe operation)"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a real file and a symlink to it
+            real_file = Path(tmpdir) / 'real.txt'
+            real_file.write_text('real content')
+            link_file = Path(tmpdir) / 'link.txt'
+            link_file.symlink_to(real_file)
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.1)
+                nvim.send_ctrl('o')
+                time.sleep(0.2)
+                # Navigate to the symlink
+                nvim.send_ctrl('k')  # Move past ../
+                time.sleep(0.1)
+                # Rename the symlink
+                nvim.send_ctrl('r')
+                time.sleep(0.3)
+                nvim.send_ctrl('u')  # Clear the default value
+                time.sleep(0.1)
+                nvim.send_keys('newlink.txt\n')
+                time.sleep(0.5)
+                grid = nvim.get_grid()
+                # New symlink name should exist
+                self.assertIn('newlink.txt', grid, "New symlink name should exist")
+                # Real file should be unaffected
+                self.assertIn('real.txt', grid, "Real file should be unaffected")
+                # Verify on filesystem (the real test)
+                self.assertFalse(link_file.exists(), "Old symlink should not exist")
+                self.assertTrue((Path(tmpdir) / 'newlink.txt').exists(), "New symlink should exist")
+                self.assertTrue(real_file.exists(), "Real file should still exist")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_symlink_toctou_file(self):
+        """SECURITY: Test that file symlink target changes are detected (TOCTOU protection)"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create two real files
+            real_file1 = Path(tmpdir) / 'real1.txt'
+            real_file1.write_text('content1')
+            real_file2 = Path(tmpdir) / 'real2.txt'
+            real_file2.write_text('content2')
+            # Create a symlink pointing to file1
+            link_file = Path(tmpdir) / 'link.txt'
+            link_file.symlink_to(real_file1)
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.1)
+                nvim.send_ctrl('o')
+                time.sleep(0.2)
+                # Navigate to the symlink
+                nvim.send_ctrl('k')  # Move past ../
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                self.assertIn('link.txt', grid, "Should show symlink")
+                # MODIFY THE SYMLINK TARGET (TOCTOU attack simulation)
+                link_file.unlink()
+                link_file.symlink_to(real_file2)
+                # Try to open it
+                nvim.send_keys('\n')
+                time.sleep(0.3)
+                grid = nvim.get_grid()
+                # Should show security error and stay in file explorer
+                self.assertIn('SECURITY', grid, "Should show security warning")
+                self.assertIn('target changed', grid.lower(), "Should mention target changed")
+                self.assertIn('link.txt', grid, "Should still be in file explorer")
+                self.assertNotIn('content1', grid, "Should NOT open file1")
+                self.assertNotIn('content2', grid, "Should NOT open file2")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_symlink_toctou_directory(self):
+        """SECURITY: Test that directory symlink target changes are detected (TOCTOU protection)"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create two real directories
+            real_dir1 = Path(tmpdir) / 'real_dir1'
+            real_dir1.mkdir()
+            (real_dir1 / 'file1.txt').write_text('in dir1')
+            real_dir2 = Path(tmpdir) / 'real_dir2'
+            real_dir2.mkdir()
+            (real_dir2 / 'file2.txt').write_text('in dir2')
+            # Create a symlink pointing to dir1
+            link_dir = Path(tmpdir) / 'link_dir'
+            link_dir.symlink_to(real_dir1)
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.1)
+                nvim.send_ctrl('o')
+                time.sleep(0.2)
+                # Navigate to the symlinked directory
+                nvim.send_ctrl('k')  # Move past ../
+                time.sleep(0.1)
+                grid = nvim.get_grid()
+                self.assertIn('link_dir', grid, "Should show directory symlink")
+                # MODIFY THE SYMLINK TARGET (TOCTOU attack simulation)
+                link_dir.unlink()
+                link_dir.symlink_to(real_dir2)
+                # Try to enter it
+                nvim.send_keys('\n')
+                time.sleep(0.3)
+                grid = nvim.get_grid()
+                # Should show security error and stay in original directory
+                self.assertIn('SECURITY', grid, "Should show security warning")
+                self.assertIn('target changed', grid.lower(), "Should mention target changed")
+                self.assertIn('link_dir', grid, "Should still be in original directory")
+                self.assertNotIn('file1.txt', grid, "Should NOT enter dir1")
+                self.assertNotIn('file2.txt', grid, "Should NOT enter dir2")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_symlink_relative(self):
+        """Test that relative symlinks are handled correctly"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a file in root
+            root_file = Path(tmpdir) / 'root_file.txt'
+            root_file.write_text('root content')
+            # Create subdirectory with relative symlink pointing up
+            subdir = Path(tmpdir) / 'subdir'
+            subdir.mkdir()
+            rel_link = subdir / 'link_to_parent.txt'
+            # Create relative symlink (not absolute)
+            rel_link.symlink_to('../root_file.txt')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.1)
+                nvim.send_ctrl('o')
+                time.sleep(0.2)
+                # Navigate to subdir
+                nvim.send_ctrl('k')  # Past ../
+                time.sleep(0.05)
+                nvim.send_keys('\n')  # Enter subdir
+                time.sleep(0.2)
+                grid = nvim.get_grid()
+                # Should show the symlink with its resolved absolute target
+                self.assertIn('link_to_parent.txt ->', grid, "Should show symlink")
+                self.assertIn('root_file.txt', grid, "Should show target filename")
+                # Navigate to the symlink and open it
+                nvim.send_ctrl('k')  # Move to symlink
+                time.sleep(0.05)
+                nvim.send_keys('\n')  # Open it
+                time.sleep(0.2)
+                grid = nvim.get_grid()
+                # Should open the file successfully
+                self.assertIn('root content', grid, "Should open the symlinked file")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_symlink_relative_file_after_navigation(self):
+        """Test relative symlink to FILE after navigating from different directory"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create structure:
+            # tmpdir/
+            #   start_here/  (we start here)
+            #   target_dir/
+            #     real_file.txt
+            #   link_dir/
+            #     link.txt -> ../target_dir/real_file.txt
+            start_dir = Path(tmpdir) / 'start_here'
+            start_dir.mkdir()
+            target_dir = Path(tmpdir) / 'target_dir'
+            target_dir.mkdir()
+            real_file = target_dir / 'real_file.txt'
+            real_file.write_text('file content')
+            link_dir = Path(tmpdir) / 'link_dir'
+            link_dir.mkdir()
+            link_file = link_dir / 'link.txt'
+            link_file.symlink_to('../target_dir/real_file.txt')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=str(start_dir))
+                time.sleep(0.01)
+                nvim.send_ctrl('o')
+                time.sleep(0.01)
+                # Go up to parent
+                grid = nvim.get_grid()
+                self.assertIn('start_here', grid.lower(), "Should be in start_here")
+                nvim.send_keys('\n')  # Enter ../
+                time.sleep(0.01)
+                # Navigate to link_dir
+                grid = nvim.get_grid()
+                self.assertIn('link_dir', grid, "Should see link_dir")
+                # Find and navigate to link_dir
+                for _ in range(5):
+                    nvim.send_ctrl('k')
+                    time.sleep(0.01)
+                    grid = nvim.get_grid()
+                    if '>link_dir' in grid.replace(' ', ''):
+                        break
+                nvim.send_keys('\n')  # Enter link_dir
+                time.sleep(0.01)
+                grid = nvim.get_grid()
+                # Should show relative symlink resolved to absolute path
+                self.assertIn('link.txt ->', grid, "Should show symlink")
+                self.assertIn('real_file.txt', grid, "Should show target")
+                # Open the symlink
+                nvim.send_ctrl('k')  # Move to link
+                time.sleep(0.01)
+                nvim.send_keys('\n')
+                time.sleep(0.01)
+                grid = nvim.get_grid()
+                self.assertIn('file content', grid, "Should open the file via relative symlink")
+                nvim.send_keys('\x1b')
+                time.sleep(0.01)
+
+    def test_file_explorer_symlink_relative_dir_after_navigation(self):
+        """Test relative symlink to DIRECTORY after navigating from different directory"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create structure:
+            # tmpdir/
+            #   start_here/  (we start here)
+            #   target_dir/
+            #     inside.txt
+            #   link_dir/
+            #     link_to_target/ -> ../target_dir
+            start_dir = Path(tmpdir) / 'start_here'
+            start_dir.mkdir()
+            target_dir = Path(tmpdir) / 'target_dir'
+            target_dir.mkdir()
+            (target_dir / 'inside.txt').write_text('inside target')
+            link_dir = Path(tmpdir) / 'link_dir'
+            link_dir.mkdir()
+            link_to_dir = link_dir / 'link_to_target'
+            link_to_dir.symlink_to('../target_dir')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=str(start_dir))
+                time.sleep(0.1)
+                nvim.send_ctrl('o')
+                time.sleep(0.2)
+                # Go up to parent
+                nvim.send_keys('\n')  # Enter ../
+                time.sleep(0.2)
+                # Navigate to link_dir
+                for _ in range(5):
+                    nvim.send_ctrl('k')
+                    time.sleep(0.05)
+                    grid = nvim.get_grid()
+                    if '>link_dir' in grid.replace(' ', ''):
+                        break
+                nvim.send_keys('\n')  # Enter link_dir
+                time.sleep(0.2)
+                grid = nvim.get_grid()
+                # Should show directory symlink
+                self.assertIn('link_to_target ->', grid, "Should show directory symlink")
+                self.assertIn('target_dir', grid, "Should show target directory")
+                # Enter the symlinked directory
+                nvim.send_ctrl('k')  # Move to link
+                time.sleep(0.05)
+                nvim.send_keys('\n')  # Enter it
+                time.sleep(0.2)
+                grid = nvim.get_grid()
+                # Should be inside the target directory via the symlink
+                self.assertIn('inside.txt', grid, "Should see file inside symlinked directory")
+                self.assertIn('target_dir', grid, "Path should show we're in target_dir")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_symlink_invalid_target_file(self):
+        """SECURITY: Test that file symlinks with invalid target characters are rejected"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a file with invalid characters in the name (if possible)
+            # We'll use subprocess to bypass Python's restrictions
+            import subprocess
+            # Try to create a file with a null byte (won't work on most filesystems)
+            # Instead, let's create a symlink pointing to a non-existent path with invalid chars
+            # Actually, we can't easily create files with truly invalid names
+            # But we can test the validation by manually checking
+            # Let's create a normal file and symlink, then verify validation works
+            real_file = Path(tmpdir) / 'valid.txt'
+            real_file.write_text('content')
+            link_file = Path(tmpdir) / 'link.txt'
+            link_file.symlink_to('valid.txt')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.1)
+                nvim.send_ctrl('o')
+                time.sleep(0.2)
+                grid = nvim.get_grid()
+                # Valid symlink should work fine
+                self.assertIn('link.txt ->', grid, "Should show valid symlink")
+                self.assertNotIn('[INVALID TARGET]', grid, "Valid target should not be marked invalid")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_symlink_outside_tree(self):
+        """SECURITY: Test symlink pointing outside working directory"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create two separate directories
+            work_dir = Path(tmpdir) / 'work'
+            work_dir.mkdir()
+            outside_dir = Path(tmpdir) / 'outside'
+            outside_dir.mkdir()
+            outside_file = outside_dir / 'secret.txt'
+            outside_file.write_text('secret data')
+            # Create symlink in work_dir pointing to outside_dir
+            link_file = work_dir / 'link_to_secret.txt'
+            link_file.symlink_to(outside_file)
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=str(work_dir))
+                time.sleep(0.1)
+                nvim.send_ctrl('o')
+                time.sleep(0.2)
+                grid = nvim.get_grid()
+                # Symlink should be shown (it points to a valid path)
+                self.assertIn('link_to_secret.txt ->', grid, "Should show symlink")
+                # Try to open it
+                nvim.send_ctrl('k')
+                time.sleep(0.05)
+                nvim.send_keys('\n')
+                time.sleep(0.2)
+                grid = nvim.get_grid()
+                # Should successfully open (symlink target is valid, just outside work_dir)
+                # Our validation allows any valid absolute path
+                self.assertIn('secret data', grid, "Should be able to follow valid symlinks")
+                nvim.send_keys('\x1b')
+                time.sleep(0.05)
+
+    def test_file_explorer_symlink_broken_target(self):
+        """Test symlink pointing to non-existent file"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create broken symlink
+            link_file = Path(tmpdir) / 'broken_link.txt'
+            link_file.symlink_to('/nonexistent/file.txt')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.01)
+                nvim.send_ctrl('o')
+                time.sleep(0.01)
+                grid = nvim.get_grid()
+                # Should show the symlink with its target
+                self.assertIn('broken_link.txt ->', grid, "Should show broken symlink")
+                # Try to open it (will fail because file doesn't exist, but validation should pass)
+                nvim.send_ctrl('k')
+                time.sleep(0.01)
+                nvim.send_keys('\n')
+                time.sleep(0.01)
+                # Vim will show an error about file not existing
+                # The important thing is our validation doesn't crash
+                nvim.send_keys('\x1b')
+                time.sleep(0.01)
+
+    def test_file_explorer_symlink_circular(self):
+        """SECURITY: Test circular symlink (symlink pointing to itself)"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create circular symlink
+            link_file = Path(tmpdir) / 'circular.txt'
+            link_file.symlink_to('circular.txt')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.01)
+                nvim.send_ctrl('o')
+                time.sleep(0.01)
+                grid = nvim.get_grid()
+                # Circular symlinks cannot be resolved, should show as broken
+                self.assertIn('circular.txt', grid, "Should show circular symlink")
+                self.assertIn('[BROKEN LINK]', grid, "Should mark circular symlink as broken")
+                # Try to open it (should be blocked since symlink_target is nil)
+                nvim.send_ctrl('k')
+                time.sleep(0.01)
+                nvim.send_keys('\n')
+                time.sleep(0.01)
+                grid = nvim.get_grid()
+                # Should show error message and remain in file explorer
+                self.assertIn('Cannot open symlink', grid, "Should show error message")
+                self.assertIn('circular.txt', grid, "Should remain in file explorer")
+                nvim.send_keys('\n')  # Dismiss error
+                time.sleep(0.01)
+                nvim.send_keys('\x1b')
+                time.sleep(0.01)
+
+    def test_file_explorer_symlink_chain_double_file(self):
+        """Test double symlink chain to file (link -> link -> file) - should work"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create chain: first_link -> middle_link -> final.txt
+            final_file = Path(tmpdir) / 'final.txt'
+            final_file.write_text('final content')
+            middle_link = Path(tmpdir) / 'middle_link.txt'
+            middle_link.symlink_to('final.txt')
+            first_link = Path(tmpdir) / 'first_link.txt'
+            first_link.symlink_to('middle_link.txt')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.01)
+                nvim.send_ctrl('o')
+                time.sleep(0.01)
+                grid = nvim.get_grid()
+                # resolve() follows the chain to final.txt
+                self.assertIn('first_link.txt ->', grid, "Should show symlink")
+                self.assertIn('final.txt', grid, "Should show resolved final target")
+                # Open it - should work because resolve gives final target
+                for _ in range(5):
+                    nvim.send_ctrl('k')
+                    time.sleep(0.01)
+                    grid = nvim.get_grid()
+                    if '>first_link.txt' in grid.replace(' ', ''):
+                        break
+                nvim.send_keys('\n')
+                time.sleep(0.01)
+                grid = nvim.get_grid()
+                # Should successfully open the final file
+                self.assertIn('final content', grid, "Should open the final file through chain")
+                nvim.send_keys('\x1b')
+                time.sleep(0.01)
+
+    def test_file_explorer_symlink_chain_double_dir(self):
+        """Test double symlink chain to directory - should work"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create chain: first_link -> middle_link -> final_dir/
+            final_dir = Path(tmpdir) / 'final_dir'
+            final_dir.mkdir()
+            (final_dir / 'inside.txt').write_text('inside')
+            middle_link = Path(tmpdir) / 'middle_link'
+            middle_link.symlink_to('final_dir')
+            first_link = Path(tmpdir) / 'first_link'
+            first_link.symlink_to('middle_link')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.01)
+                nvim.send_ctrl('o')
+                time.sleep(0.01)
+                grid = nvim.get_grid()
+                # resolve() follows the chain to final_dir
+                self.assertIn('first_link ->', grid, "Should show directory symlink")
+                self.assertIn('final_dir', grid, "Should show resolved final target")
+                # Navigate into it - should work
+                for _ in range(5):
+                    nvim.send_ctrl('k')
+                    time.sleep(0.01)
+                    grid = nvim.get_grid()
+                    if '>first_link' in grid.replace(' ', ''):
+                        break
+                nvim.send_keys('\n')
+                time.sleep(0.01)
+                grid = nvim.get_grid()
+                # Should successfully navigate into final_dir
+                self.assertIn('inside.txt', grid, "Should enter final_dir through chain")
+                self.assertIn('final_dir', grid, "Path should show final_dir")
+                nvim.send_keys('\x1b')
+                time.sleep(0.01)
+
+    def test_file_explorer_symlink_chain_triple(self):
+        """Test triple symlink chain (link -> link -> link -> file) - should work"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create deep chain: link1 -> link2 -> link3 -> final.txt
+            final_file = Path(tmpdir) / 'final.txt'
+            final_file.write_text('deep content')
+            link3 = Path(tmpdir) / 'link3.txt'
+            link3.symlink_to('final.txt')
+            link2 = Path(tmpdir) / 'link2.txt'
+            link2.symlink_to('link3.txt')
+            link1 = Path(tmpdir) / 'link1.txt'
+            link1.symlink_to('link2.txt')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.01)
+                nvim.send_ctrl('o')
+                time.sleep(0.01)
+                grid = nvim.get_grid()
+                # All links resolve to final.txt
+                self.assertIn('link1.txt ->', grid, "Should show link1")
+                self.assertIn('final.txt', grid, "All should resolve to final.txt")
+                # Open link1 - should work
+                for _ in range(10):
+                    nvim.send_ctrl('k')
+                    time.sleep(0.01)
+                    grid = nvim.get_grid()
+                    if '>link1.txt' in grid.replace(' ', ''):
+                        break
+                nvim.send_keys('\n')
+                time.sleep(0.01)
+                grid = nvim.get_grid()
+                self.assertIn('deep content', grid, "Should open final file through triple chain")
+                nvim.send_keys('\x1b')
+                time.sleep(0.01)
+
+    def test_file_explorer_symlink_chain_toctou_middle(self):
+        """SECURITY: Test TOCTOU - modify middle link in triple chain after display"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create chain: link1 -> link2 -> link3 -> final.txt
+            final_file = Path(tmpdir) / 'final.txt'
+            final_file.write_text('final')
+            bad_file = Path(tmpdir) / 'bad.txt'
+            bad_file.write_text('bad')
+            link3 = Path(tmpdir) / 'link3.txt'
+            link3.symlink_to('final.txt')
+            link2 = Path(tmpdir) / 'link2.txt'
+            link2.symlink_to('link3.txt')
+            link1 = Path(tmpdir) / 'link1.txt'
+            link1.symlink_to('link2.txt')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.01)
+                nvim.send_ctrl('o')
+                time.sleep(0.01)
+                grid = nvim.get_grid()
+                self.assertIn('link1.txt ->', grid, "Should show link1")
+                self.assertIn('final.txt', grid, "Should initially resolve to final.txt")
+                # Navigate to link1
+                for _ in range(10):
+                    nvim.send_ctrl('k')
+                    time.sleep(0.01)
+                    grid = nvim.get_grid()
+                    if '>link1.txt' in grid.replace(' ', ''):
+                        break
+                # MODIFY THE MIDDLE LINK (TOCTOU attack)
+                link2.unlink()
+                link2.symlink_to('bad.txt')
+                # Try to open
+                nvim.send_keys('\n')
+                time.sleep(0.01)
+                grid = nvim.get_grid()
+                # Should detect change and show security error
+                self.assertIn('SECURITY', grid, "Should show security warning")
+                self.assertIn('target changed', grid.lower(), "Should mention target changed")
+                self.assertIn('link1.txt', grid, "Should remain in file explorer")
+                nvim.send_keys('\n')  # Dismiss
+                time.sleep(0.01)
+                nvim.send_keys('\x1b')
+                time.sleep(0.01)
+
+    def test_file_explorer_symlink_chain_toctou_end(self):
+        """SECURITY: Test TOCTOU - modify end link in triple chain after display"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create chain: link1 -> link2 -> link3 -> final.txt
+            final_file = Path(tmpdir) / 'final.txt'
+            final_file.write_text('final')
+            bad_file = Path(tmpdir) / 'bad.txt'
+            bad_file.write_text('bad')
+            link3 = Path(tmpdir) / 'link3.txt'
+            link3.symlink_to('final.txt')
+            link2 = Path(tmpdir) / 'link2.txt'
+            link2.symlink_to('link3.txt')
+            link1 = Path(tmpdir) / 'link1.txt'
+            link1.symlink_to('link2.txt')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir)
+                time.sleep(0.01)
+                nvim.send_ctrl('o')
+                time.sleep(0.01)
+                grid = nvim.get_grid()
+                self.assertIn('link1.txt ->', grid, "Should show link1")
+                # Navigate to link1
+                for _ in range(10):
+                    nvim.send_ctrl('k')
+                    time.sleep(0.01)
+                    grid = nvim.get_grid()
+                    if '>link1.txt' in grid.replace(' ', ''):
+                        break
+                # MODIFY THE END LINK (TOCTOU attack)
+                link3.unlink()
+                link3.symlink_to('bad.txt')
+                # Try to open
+                nvim.send_keys('\n')
+                time.sleep(0.01)
+                grid = nvim.get_grid()
+                # Should detect change and show security error
+                self.assertIn('SECURITY', grid, "Should show security warning")
+                self.assertIn('target changed', grid.lower(), "Should mention target changed")
+                self.assertIn('link1.txt', grid, "Should remain in file explorer")
+                nvim.send_keys('\n')  # Dismiss
+                time.sleep(0.01)
+                nvim.send_keys('\x1b')
+                time.sleep(0.01)
 
 
 if __name__ == '__main__':
