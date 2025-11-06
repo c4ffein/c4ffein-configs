@@ -49,20 +49,4 @@ function M.get_files()
   return return_table
 end
 
-function M.get_printable_file_infos(file_path)
-  local path_starter, short_path, selected_color = "/", file_path, "FileFinderPathRoot"
-  if short_path:sub(1, #config.current_directory) == config.current_directory then
-    path_starter, selected_color = ".", "FileFinderPathCd"
-    short_path = short_path:sub(#config.current_directory + 1, #short_path)
-  elseif short_path:sub(1, #M.HOME) == M.HOME then
-    path_starter, selected_color = "~", "FileFinderPathHome"
-    short_path = short_path:sub(#M.HOME + 1, #short_path)
-  else
-    short_path = short_path:sub(2, #short_path)
-  end
-  return {
-    full_path = file_path, path_starter = path_starter, short_path = short_path, selected_color = selected_color
-  }
-end
-
 return M

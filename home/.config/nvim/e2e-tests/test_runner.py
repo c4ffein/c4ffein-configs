@@ -36,6 +36,16 @@ class NvimTerminal:
         self.cursor_row = 0
         self.cursor_col = 0
 
+    def format_grid_for_error(self, title="Grid Output"):
+        """Format grid for readable error messages with line numbers"""
+        grid_text = self.get_grid()
+        lines = grid_text.split('\n')
+        formatted = f"\n{'='*80}\n{title}:\n{'='*80}\n"
+        for i, line in enumerate(lines):
+            formatted += f"{i:3d} | {line}\n"
+        formatted += f"{'='*80}\n"
+        return formatted
+
     def start(self, cwd=None, filename=None):
         """Start nvim in a pty"""
         import shutil
@@ -67,7 +77,7 @@ class NvimTerminal:
             # Read initial output
             self._read_output(timeout=0.01)
 
-    def send_keys(self, keys):
+    def send_keys(self, keys, keys_delay = 0.002):
         """Send keystrokes to nvim (one by one)"""
         for char in keys:
             if char == '\n':
@@ -78,7 +88,7 @@ class NvimTerminal:
                 os.write(self.master_fd, b'\x1b')
             else:
                 os.write(self.master_fd, char.encode('utf-8'))
-            time.sleep(0.002)  # Small delay between keys
+            time.sleep(keys_delay)
         # Wait a bit for nvim to process
         time.sleep(0.01)
         self._read_output(timeout=0.02)
@@ -211,6 +221,56 @@ class NvimTerminal:
             print(f"\n=== GRID OUTPUT ===\n{result}\n===================\n", flush=True)
         return result
 
+    def get_popup_content(self, which='largest'):
+        """Extract content from popup window (between ┌─ and └─ borders)
+
+        Args:
+            which: 'largest' to get the biggest popup (default), or index number
+        """
+        grid = self.get_grid()
+        lines = grid.split('\n')
+        # Find all popups (pairs of top and bottom borders)
+        popups = []
+        i = 0
+        while i < len(lines):
+            if '┌' in lines[i] and '─' in lines[i]:
+                top_idx = i
+                # Find matching bottom border
+                bottom_idx = None
+                for j in range(top_idx + 1, len(lines)):
+                    if '└' in lines[j] and '─' in lines[j]:
+                        bottom_idx = j
+                        break
+                if bottom_idx is not None:
+                    popups.append((top_idx, bottom_idx))
+                    i = bottom_idx + 1
+                else:
+                    i += 1
+            else:
+                i += 1
+        if not popups:
+            return None  # No popup found
+        # Select which popup to extract
+        if which == 'largest':
+            # Get the largest popup by content line count
+            popup = max(popups, key=lambda p: p[1] - p[0])
+        else:
+            # Get by index
+            popup = popups[which] if which < len(popups) else popups[0]
+        top_idx, bottom_idx = popup
+        # Extract content between borders (excluding border lines themselves)
+        popup_lines = []
+        for i in range(top_idx + 1, bottom_idx):
+            line = lines[i]
+            # Remove the border characters │ from left and right
+            # Find first and last │
+            first_pipe = line.find('│')
+            last_pipe = line.rfind('│')
+            if first_pipe != -1 and last_pipe != -1 and first_pipe != last_pipe:
+                content = line[first_pipe + 1:last_pipe]
+                popup_lines.append(content)
+        return '\n'.join(popup_lines)
+
     def get_screen(self, clear_buffer=False):
         """Get current screen content (decoded)"""
         # Read any pending output first
@@ -265,7 +325,50 @@ class NvimTerminal:
         self.close()
 
 
-class TestMakeRunner(unittest.TestCase):
+class ReadableAssertionsMixin:
+    """Mixin to make assertion errors with multi-line strings more readable"""
+
+    def _format_multiline_string(self, text, title="String content"):
+        """Format a multi-line string with line numbers for readability"""
+        if '\n' not in str(text):
+            return text
+        lines = str(text).split('\n')
+        formatted = f"\n{'='*80}\n{title}:\n{'='*80}\n"
+        for i, line in enumerate(lines):
+            formatted += f"{i:3d} | {line}\n"
+        formatted += f"{'='*80}"
+        return formatted
+
+    def assertIn(self, member, container, msg=None):
+        """Override assertIn to format multi-line containers"""
+        try:
+            super().assertIn(member, container, msg)
+        except AssertionError as e:
+            if '\n' in str(container):
+                formatted_container = self._format_multiline_string(container, f"Container (searched for '{member}')")
+                if msg:
+                    raise AssertionError(f"{msg}\n{formatted_container}")
+                else:
+                    raise AssertionError(f"'{member}' not found in:{formatted_container}")
+            else:
+                raise
+
+    def assertNotIn(self, member, container, msg=None):
+        """Override assertNotIn to format multi-line containers"""
+        try:
+            super().assertNotIn(member, container, msg)
+        except AssertionError as e:
+            if '\n' in str(container):
+                formatted_container = self._format_multiline_string(container, f"Container (unexpectedly found '{member}')")
+                if msg:
+                    raise AssertionError(f"{msg}\n{formatted_container}")
+                else:
+                    raise AssertionError(f"'{member}' unexpectedly found in:{formatted_container}")
+            else:
+                raise
+
+
+class TestMakeRunner(ReadableAssertionsMixin, unittest.TestCase):
     """E2E tests for make-runner"""
 
     @classmethod
@@ -478,7 +581,7 @@ class TestMakeRunner(unittest.TestCase):
                 self.assertNotIn('build', grid)
 
 
-class TestFileFinder(unittest.TestCase):
+class TestFileFinder(ReadableAssertionsMixin, unittest.TestCase):
     """E2E tests for file-finder"""
 
     @classmethod
@@ -534,10 +637,10 @@ class TestFileFinder(unittest.TestCase):
             (Path(tmpdir) / 'deploy.txt').write_text('deploy')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir, filename='test.txt')
-                time.sleep(0.02)
+                time.sleep(0.8)
                 # Open file-finder
                 nvim.send_keys('O')
-                time.sleep(0.03)
+                time.sleep(1.2)
                 # All files should be visible initially
                 grid = nvim.get_grid()
                 self.assertIn('test.txt', grid)
@@ -545,7 +648,7 @@ class TestFileFinder(unittest.TestCase):
                 self.assertIn('deploy.txt', grid)
                 # Type "te" to filter
                 nvim.send_keys('te')
-                time.sleep(0.03)
+                time.sleep(1.2)
                 # Only test.txt should match
                 grid = nvim.get_grid()
                 self.assertIn('test.txt', grid)
@@ -579,10 +682,10 @@ class TestFileFinder(unittest.TestCase):
             (subdir / 'nested.txt').write_text('nested')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir, filename='root.txt')
-                time.sleep(0.02)
+                time.sleep(0.2)
                 # Open file-finder
                 nvim.send_keys('O')
-                time.sleep(0.03)
+                time.sleep(0.5)
                 # Should see both root and subdirectory files
                 grid = nvim.get_grid()
                 self.assertIn('root.txt', grid)
@@ -619,10 +722,10 @@ class TestFileFinder(unittest.TestCase):
                 (Path(tmpdir) / f'file{i:02d}.txt').write_text(f'content {i}')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir, filename='file00.txt')
-                time.sleep(0.02)
+                time.sleep(0.8)
                 # Open file-finder
                 nvim.send_keys('O')
-                time.sleep(0.03)
+                time.sleep(1.2)
                 # Should see file list
                 grid = nvim.get_grid()
                 self.assertIn('file00.txt', grid)
@@ -653,10 +756,10 @@ class TestFileFinder(unittest.TestCase):
             (Path(tmpdir) / 'file.with.dots.txt').write_text('dots')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir, filename='file-with-dash.txt')
-                time.sleep(0.02)
+                time.sleep(0.2)
                 # Open file-finder
                 nvim.send_keys('O')
-                time.sleep(0.03)
+                time.sleep(0.5)
                 # All files should be visible
                 grid = nvim.get_grid()
                 self.assertIn('file-with-dash.txt', grid)
@@ -737,10 +840,10 @@ class TestFileFinder(unittest.TestCase):
             (Path(tmpdir) / 'root.txt').write_text('root')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir, filename='root.txt')
-                time.sleep(0.02)
+                time.sleep(0.8)
                 # Open file-finder
                 nvim.send_keys('O')
-                time.sleep(0.03)
+                time.sleep(1.2)
                 # Should see both root and deep files
                 grid = nvim.get_grid()
                 self.assertIn('root.txt', grid)
@@ -758,10 +861,9 @@ class TestFileFinder(unittest.TestCase):
                 time.sleep(0.02)
                 # Open file-finder
                 nvim.send_keys('O')
-                time.sleep(0.03)
+                time.sleep(1)
                 # Search for 'testword' which appears 10 times
-                nvim.send_keys('testword')
-                time.sleep(0.05)
+                nvim.send_keys('testword', keys_delay=0.2)
                 grid = nvim.get_grid()
                 lines = grid.split('\n')
                 # Find the line with the filename
@@ -801,32 +903,33 @@ class TestFileFinder(unittest.TestCase):
             (Path(tmpdir) / 'data.txt').write_text(content)
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir, filename='data.txt')
-                time.sleep(0.02)
+                time.sleep(0.5)
                 # Open file-finder
                 nvim.send_keys('O')
-                time.sleep(0.03)
+                time.sleep(1.0)
                 # Search for 'XYZABC'
                 nvim.send_keys('XYZABC')
-                time.sleep(0.05)
-                grid = nvim.get_grid()
-                lines = grid.split('\n')
-                # Find filename and count matched lines after it
+                time.sleep(1.0)
+                popup_content = nvim.get_popup_content()
+                self.assertIsNotNone(popup_content, "Should find popup window")
+                lines = popup_content.split('\n')
+                # Find filename
                 filename_idx = next((i for i, l in enumerate(lines) if 'data.txt' in l), None)
-                self.assertIsNotNone(filename_idx, "Should find 'data.txt' in grid")
-                # Count lines with "XYZABC number" after filename (before next file or empty)
+                self.assertIsNotNone(filename_idx, "Should find 'data.txt' in popup")
+                # Count lines with "XYZABC number" after filename
                 initial_count = 0
                 for i in range(filename_idx + 1, len(lines)):
                     if 'XYZABC number' in lines[i]:
                         initial_count += 1
-                    elif lines[i].strip() and not lines[i].strip().startswith('~'):
+                    elif lines[i].strip():
                         # Hit another file or non-match content, stop counting
                         break
                 self.assertGreater(initial_count, 0, "Should show some matched lines initially")
                 # Press ≠ (could link to Ctrl+= in your term) to increase lines (give UI time to update)
                 nvim.send_keys('≠')
                 time.sleep(0.1)  # More time for grid to re-render
-                grid_after_plus = nvim.get_grid()
-                lines_after_plus = grid_after_plus.split('\n')
+                popup_after_plus = nvim.get_popup_content()
+                lines_after_plus = popup_after_plus.split('\n')
                 # Count again after pressing +
                 filename_idx_plus = next((i for i, l in enumerate(lines_after_plus) if 'data.txt' in l), None)
                 self.assertIsNotNone(filename_idx_plus, "Should still find 'data.txt' after +")
@@ -834,7 +937,7 @@ class TestFileFinder(unittest.TestCase):
                 for i in range(filename_idx_plus + 1, len(lines_after_plus)):
                     if 'XYZABC number' in lines_after_plus[i]:
                         plus_count += 1
-                    elif lines_after_plus[i].strip() and not lines_after_plus[i].strip().startswith('~'):
+                    elif lines_after_plus[i].strip():
                         break
                 # Check precisely +1 (should increase by exactly 1)
                 self.assertEqual(plus_count, initial_count + 1,
@@ -842,8 +945,8 @@ class TestFileFinder(unittest.TestCase):
                 # Press – (could link to Ctrl+- in your term - warning not regular -)(Ctrl+) to decrease lines
                 nvim.send_keys('–')
                 time.sleep(0.1)  # More time for grid to re-render
-                grid_after_minus = nvim.get_grid()
-                lines_after_minus = grid_after_minus.split('\n')
+                popup_after_minus = nvim.get_popup_content()
+                lines_after_minus = popup_after_minus.split('\n')
                 # Count again after pressing - (should be back to initial_count)
                 filename_idx_minus = next((i for i, l in enumerate(lines_after_minus) if 'data.txt' in l), None)
                 self.assertIsNotNone(filename_idx_minus, "Should still find 'data.txt' after -")
@@ -851,7 +954,7 @@ class TestFileFinder(unittest.TestCase):
                 for i in range(filename_idx_minus + 1, len(lines_after_minus)):
                     if 'XYZABC number' in lines_after_minus[i]:
                         minus_count += 1
-                    elif lines_after_minus[i].strip() and not lines_after_minus[i].strip().startswith('~'):
+                    elif lines_after_minus[i].strip():
                         break
                 # Check precisely went back to initial (should be exactly initial_count)
                 self.assertEqual(minus_count, initial_count,
@@ -859,8 +962,8 @@ class TestFileFinder(unittest.TestCase):
                 # Press – (Ctrl+-) again to go to initial-1
                 nvim.send_keys('–')
                 time.sleep(0.05)  # More time for grid to re-render
-                grid_after_minus2 = nvim.get_grid()
-                lines_after_minus2 = grid_after_minus2.split('\n')
+                popup_after_minus2 = nvim.get_popup_content()
+                lines_after_minus2 = popup_after_minus2.split('\n')
                 filename_idx_minus2 = next((i for i, l in enumerate(lines_after_minus2) if 'data.txt' in l), None)
                 self.assertIsNotNone(filename_idx_minus2, "Should still find 'data.txt' after second -")
                 minus2_count = 0
@@ -881,18 +984,19 @@ class TestFileFinder(unittest.TestCase):
             (Path(tmpdir) / 'few_matches.txt').write_text(content)
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir, filename='few_matches.txt')
-                time.sleep(0.02)
+                time.sleep(0.2)
                 # Open file-finder
                 nvim.send_keys('O')
-                time.sleep(0.03)
+                time.sleep(0.3)
                 # Search for 'match'
                 nvim.send_keys('match')
-                time.sleep(0.03)
-                grid = nvim.get_grid()
-                lines = grid.split('\n')
+                time.sleep(0.3)
+                popup_content = nvim.get_popup_content()
+                self.assertIsNotNone(popup_content, "Should find popup window")
+                lines = popup_content.split('\n')
                 # Find the filename
                 filename_idx = next((i for i, l in enumerate(lines) if 'few_matches.txt' in l), None)
-                self.assertIsNotNone(filename_idx, "Should find 'few_matches.txt' in grid")
+                self.assertIsNotNone(filename_idx, "Should find 'few_matches.txt' in popup")
                 # Check the structure: filename, then 2 matched lines, NO "..."
                 # Line filename_idx+1 should contain "line 1 with match"
                 if filename_idx + 1 < len(lines):
@@ -969,8 +1073,77 @@ class TestFileFinder(unittest.TestCase):
                     f"Got b at {file_b_idx}, a at {file_a_idx}"
                 )
 
+    def test_file_finder_broken_regex_parenthesis(self):
+        """Test searching for single parenthesis (broken regex fallback to plain text)"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'func(param).txt').write_text('function with parenthesis')
+            (Path(tmpdir) / 'noparens.txt').write_text('no parenthesis here')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='noparens.txt')
+                time.sleep(0.02)
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                nvim.send_keys('(')
+                time.sleep(0.03)
+                grid = nvim.get_grid()
+                self.assertIn('func(param).txt', grid)
 
-class TestFileExplorer(unittest.TestCase):
+    def test_file_finder_valid_regex_pattern(self):
+        """Test searching with a valid regex pattern"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'readme.md').write_text('readme')
+            (Path(tmpdir) / 'main.py').write_text('main code')
+            (Path(tmpdir) / 'test.py').write_text('test code')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='readme.md')
+                time.sleep(0.02)
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                nvim.send_keys('.*py')
+                time.sleep(0.03)
+                grid = nvim.get_grid()
+                self.assertIn('main.py', grid)
+                self.assertIn('test.py', grid)
+
+    def test_file_finder_switch_mode_with_ctrl_o(self):
+        """Test switching between tree and history mode with Ctrl-o"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'file1.txt').write_text('content 1')
+            (Path(tmpdir) / 'file2.txt').write_text('content 2')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='file1.txt')
+                time.sleep(0.2)
+                nvim.send_keys('O')
+                time.sleep(0.5)
+                grid = nvim.get_grid()
+                self.assertIn('file1.txt', grid)
+                self.assertIn('file2.txt', grid)
+                nvim.send_ctrl('o')
+                time.sleep(0.5)
+                grid = nvim.get_grid()
+                self.assertIn('>', grid)
+
+    def test_file_finder_mode_switch_preserves_pattern(self):
+        """Test that switching modes preserves the search pattern"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'test_file.txt').write_text('test')
+            (Path(tmpdir) / 'another.txt').write_text('another')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='test_file.txt')
+                time.sleep(0.02)
+                nvim.send_keys('O')
+                time.sleep(0.03)
+                nvim.send_keys('test')
+                time.sleep(0.03)
+                grid = nvim.get_grid()
+                self.assertIn('test_file.txt', grid)
+                nvim.send_ctrl('o')
+                time.sleep(0.03)
+                grid = nvim.get_grid()
+                self.assertIn('test', grid)
+
+
+class TestFileExplorer(ReadableAssertionsMixin, unittest.TestCase):
     def setUp(self):
         self.config_dir = Path.cwd()
 
@@ -1147,9 +1320,9 @@ class TestFileExplorer(unittest.TestCase):
             (dir3 / 'file_in_third.txt').write_text('content from third')
             with NvimTerminal(self.config_dir) as nvim:
                 nvim.start(cwd=tmpdir)
-                time.sleep(0.01)
+                time.sleep(0.05)
                 nvim.send_ctrl('o')
-                time.sleep(0.01)
+                time.sleep(0.05)
                 # Initial state: should see all 3 dirs
                 grid = nvim.get_grid()
                 self.assertIn('aaa_first/', grid, "Should see first directory")
@@ -1158,21 +1331,21 @@ class TestFileExplorer(unittest.TestCase):
                 # Use Ctrl+k twice to navigate to third directory (ccc_third)
                 # First entry might be ../ so we need to navigate down
                 nvim.send_ctrl('k')  # Move down once
-                time.sleep(0.01)
+                time.sleep(0.05)
                 nvim.send_ctrl('k')  # Move down twice
-                time.sleep(0.01)
+                time.sleep(0.05)
                 # Enter the directory (should be bbb_second now)
                 nvim.send_keys('\n')
-                time.sleep(0.01)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 # Should be inside bbb_second
                 self.assertIn('bbb_second', grid, "Should show bbb_second in path")
                 self.assertIn('file_in_second.txt', grid, "Should show file_in_second.txt")
                 # Select the file (should be first entry) and open it
                 nvim.send_ctrl('k')  # Move to file
-                time.sleep(0.01)
+                time.sleep(0.05)
                 nvim.send_keys('\n')  # Open file
-                time.sleep(0.01)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 # Should see file content
                 self.assertIn('content from second', grid, "Should show content from second file")
@@ -1717,22 +1890,22 @@ class TestFileExplorer(unittest.TestCase):
                 # Verify file-explorer is open
                 self.assertIn('../', grid, "File explorer should be open")
                 # Find and navigate to bad@file.txt (shown as badXfile.txt)
-                if 'badXfile' in grid:
-                    # Navigate to it
-                    nvim.send_ctrl('k')  # Move to first file
-                    time.sleep(0.01)
-                    grid = nvim.get_grid()
-                    # Verify we're on the bad file (selection marker '>')
-                    # Try to open it
-                    nvim.send_keys('\n')
-                    time.sleep(0.01)
-                    # Should still be in file-explorer (not opened)
-                    grid = nvim.get_grid()
-                    self.assertIn('badXfile', grid, "Should still show file explorer after trying to open invalid file")
-                    # Should NOT show the file content
-                    self.assertNotIn('should not open', grid, "Should not open invalid file")
-                    # Should show error message
-                    self.assertIn('Cannot open file', grid, "Should show error message")
+                self.assertIn('badXfile', grid, "Should find badXfile in grid")
+                # Navigate to it
+                nvim.send_ctrl('k')  # Move to first file
+                time.sleep(0.01)
+                grid = nvim.get_grid()
+                # Verify we're on the bad file (selection marker '>')
+                # Try to open it
+                nvim.send_keys('\n')
+                time.sleep(0.01)
+                # Should still be in file-explorer (not opened)
+                grid = nvim.get_grid()
+                self.assertIn('badXfile', grid, "Should still show file explorer after trying to open invalid file")
+                # Should NOT show the file content
+                self.assertNotIn('should not open', grid, "Should not open invalid file")
+                # Should show error message
+                self.assertIn('Cannot open file', grid, "Should show error message")
                 # Now navigate to and open the valid file
                 # Close and reopen file-explorer to clear any state
                 nvim.send_keys('\x1b')
@@ -1743,13 +1916,13 @@ class TestFileExplorer(unittest.TestCase):
                 nvim.send_ctrl('k')  # Move past ../
                 time.sleep(0.01)
                 grid = nvim.get_grid()
-                if 'badXfile' in grid:
+                if '> badXfile' in grid:  # if cursor on badXfile
                     # We're on bad file, move to next
                     nvim.send_ctrl('k')
-                    time.sleep(0.01)
+                    time.sleep(0.05)
                 # Now open the file
                 nvim.send_keys('\n')
-                time.sleep(0.01)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 # Should open successfully
                 self.assertIn('should open', grid, "Should open valid file")
@@ -2198,9 +2371,9 @@ class TestFileExplorer(unittest.TestCase):
                 self.assertIn('real_file.txt', grid, "Should show target")
                 # Open the symlink
                 nvim.send_ctrl('k')  # Move to link
-                time.sleep(0.01)
+                time.sleep(0.05)
                 nvim.send_keys('\n')
-                time.sleep(0.01)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 self.assertIn('file content', grid, "Should open the file via relative symlink")
                 nvim.send_keys('\x1b')

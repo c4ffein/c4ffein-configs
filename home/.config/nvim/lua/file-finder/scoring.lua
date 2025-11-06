@@ -1,7 +1,6 @@
 local M = {}
 
 local config = require("file-finder.config")
-local files = require("file-finder.files")
 
 function M.score(pattern, str, skip_regex_matching)
   -- WARNING `find` raises on ["(" => ""] and ["t(" => "tt(("] but doesnt raise on ["t(" => ""]
@@ -22,36 +21,34 @@ function M.score(pattern, str, skip_regex_matching)
 end
 
 function M.filter(pattern, items, key_func, file_only_mode, history_rank)
-  -- TODO the state of pattern matching or no should be shown in the ui
-  -- TODO handle this before, reuse history like with the o version?
-  --      => so that path computation should actually be done elsewhere
-  if not pattern or pattern == "" then return items end
+  if not pattern or pattern == "" then return items, false end
   local scored_items, skip_regex_matching = {}, false
   key_func = key_func or function(item) return item end
   history_rank = history_rank or {}
   for _, item in ipairs(items) do
     local file_path, key, item_score, current_score = item.file, key_func(item), 0, 0
-    local printed_path = files.get_printable_file_infos(item.file).short_path -- may refactor to avoid double exec
-    -- next line is a quick and dirty fix, this function should receive full and partial path anyway
-    if not file_only_mode then printed_path = item.file end -- otherwise match on title doesn't work with O
-    skip_regex_matching, current_score, start_pos, end_pos = M.score(pattern, printed_path, skip_regex_matching)
+    skip_regex_matching, current_score, start_pos, end_pos = M.score(pattern, item.printed_path, skip_regex_matching)
     item_score = current_score * 1000
     local matched_lines = {}
     local line_num = 0
     if not file_only_mode then
-      for line in io.lines(file_path) do
-        line_num = line_num + 1
-        skip_regex_matching, current_score, start_pos, end_pos = M.score(pattern, line, skip_regex_matching)
-        item_score = item_score + current_score
-        -- Collect up to MAX_LINES_PER_FILE + 1 to know if "..." indicator is needed
-        if current_score > 0 and #matched_lines < config.MAX_LINES_PER_FILE + 1 then
-          table.insert(matched_lines, {line_num = line_num, content = line, start_pos = start_pos, end_pos = end_pos})
+      local abs_file_path = file_path:sub(1, 1) == "/" and file_path or (config.current_directory .. file_path)
+      local ok, iter = pcall(io.lines, abs_file_path)
+      if ok and iter then
+        for line in iter do
+          line_num = line_num + 1
+          skip_regex_matching, current_score, start_pos, end_pos = M.score(pattern, line, skip_regex_matching)
+          item_score = item_score + current_score
+          -- Collect up to MAX_LINES_PER_FILE + 1 to know if "..." indicator is needed
+          if current_score > 0 and #matched_lines < config.MAX_LINES_PER_FILE + 1 then
+            table.insert(matched_lines, {line_num = line_num, content = line, start_pos = start_pos, end_pos = end_pos})
+          end
         end
       end
     end
     if item_score > 0 then
       local rank = history_rank[file_path] or math.huge  -- Files not in history get worst rank
-      table.insert(scored_items, {file_path = file_path, score = item_score, key = key, matched_lines = matched_lines, history_rank = rank})
+      table.insert(scored_items, {file_path = file_path, score = item_score, key = key, matched_lines = matched_lines, history_rank = rank, printed_path = item.printed_path})
     end
   end
 
@@ -63,12 +60,12 @@ function M.filter(pattern, items, key_func, file_only_mode, history_rank)
     -- Tiebreaker: use history rank (lower is better = more recent)
     return a.history_rank < b.history_rank
   end)
-  
+
   local result = {}
   for _, scored_item in ipairs(scored_items) do
-    table.insert(result, {file = scored_item.file_path, matched_lines = scored_item.matched_lines})
+    table.insert(result, {file = scored_item.file_path, matched_lines = scored_item.matched_lines, printed_path = scored_item.printed_path})
   end
-  return result
+  return result, skip_regex_matching
 end
 
 return M

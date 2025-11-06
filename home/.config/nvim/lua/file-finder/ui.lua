@@ -141,7 +141,45 @@ local function get_visual_selection()
   return lines[1]
 end
 
+local function add_short_paths(items)
+  for _, item in ipairs(items) do
+    local abs_path = item.file
+    local rel_path = abs_path
+    if abs_path:sub(1, #config.current_directory) == config.current_directory then
+      rel_path = abs_path:sub(#config.current_directory + 1)
+    elseif abs_path:sub(1, #files.HOME) == files.HOME then
+      rel_path = abs_path:sub(#files.HOME + 1)
+    else
+      rel_path = abs_path:sub(2)
+    end
+    item.short_path = rel_path
+  end
+  return items
+end
+
+local function enrich_display_info(items, count)
+  for i = 1, math.min(#items, count or 50) do
+    local item = items[i]
+    local path_starter, selected_color = "/", "FileFinderPathRoot"
+    if item.file:sub(1, #config.current_directory) == config.current_directory then
+      path_starter, selected_color = ".", "FileFinderPathCd"
+    elseif item.file:sub(1, #files.HOME) == files.HOME then
+      path_starter, selected_color = "~", "FileFinderPathHome"
+    end
+    item.printable = {
+      full_path = item.file,
+      path_starter = path_starter,
+      short_path = item.printed_path,
+      selected_color = selected_color
+    }
+  end
+  return items
+end
+
 local function update_display(filtered_files)
+  if M.history_only_mode then
+    enrich_display_info(filtered_files, 50)
+  end
   local display_items = {}
   M.lines_infos = {}
   for i = 1, math.min(#filtered_files, 50) do
@@ -153,8 +191,7 @@ local function update_display(filtered_files)
       table.insert(display_items, item.file)
       table.insert(M.lines_infos, { file = item.file, colors = { { "FileFinderPathCd", 0, 9000 } } })
     else
-      local infos = files.get_printable_file_infos(item.file)
-      local path_starter, short_path, selected_color = infos.path_starter, infos.short_path, infos.selected_color
+      local path_starter, short_path, selected_color = item.printable.path_starter, item.printable.short_path, item.printable.selected_color
       local line_number_as_str = tostring(i - 1)
       if i <  11 then line_number_as_str = " " .. line_number_as_str end
       if i < 101 then line_number_as_str = " " .. line_number_as_str end
@@ -183,7 +220,6 @@ local function update_display(filtered_files)
           line_number = match.line_num
         } )
       end
-      -- DONE: Show "..." as an additional line if there are more matches than displayed
       if #item.matched_lines > M.lines_per_file then
         table.insert(display_items, "      ...")
         table.insert(M.lines_infos, { file = item.file, colors = { { "FileFinderLineNumber", 0, 9000 } } })
@@ -198,8 +234,10 @@ function M.start(history_only_mode)
   local visual_selection = get_visual_selection()  -- get this value before UI setup
 
   local all_files_from_tree = files.get_files()
-  local all_files_from_history = history.load_history_for_ui()
-  local obtained_files, filtered_files, selected_line, pattern = {}, {}, 1, ""
+  local all_files_from_history = add_short_paths(history.load_history_for_ui())
+  for _, item in ipairs(all_files_from_tree) do item.printed_path = item.file end
+  for _, item in ipairs(all_files_from_history) do item.printed_path = item.short_path end
+  local obtained_files, filtered_files, selected_line, pattern, skip_regex = {}, {}, 1, "", false
 
   -- Build history rank map: file_path -> rank (lower = more recent)
   -- Convert absolute paths from history to relative paths to match file tree
@@ -227,12 +265,19 @@ function M.start(history_only_mode)
   local function on_input_change(force)
     local lines = vim.api.nvim_buf_get_lines(M.prompt_buf, 0, -1, false)
     local new_pattern = lines[1] and lines[1]:gsub("^> ", "") or ""
-    
     if new_pattern ~= pattern or force then
       pattern = new_pattern
-      filtered_files = scoring.filter(pattern, obtained_files, nil, M.history_only_mode, history_rank)
+      filtered_files, skip_regex = scoring.filter(pattern, obtained_files, nil, M.history_only_mode, history_rank)
       selected_line = 1
       update_display(filtered_files)
+      local ns_id = vim.api.nvim_create_namespace("file_finder_prompt_color")
+      vim.api.nvim_buf_clear_namespace(M.prompt_buf, ns_id, 0, -1)
+      if skip_regex then
+        vim.api.nvim_buf_set_extmark(M.prompt_buf, ns_id, 0, 0, {
+          virt_text = {{">", "FileFinderLineMatch"}},
+          virt_text_pos = "overlay"
+        })
+      end
     end
   end
 

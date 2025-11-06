@@ -1,6 +1,7 @@
 local M = {}
 
 local operations = require("file-explorer.operations")
+local ff_config = require("file-finder.config")
 
 -- State
 M.path_buf = nil
@@ -253,6 +254,7 @@ local function enter_selected()
       vim.notify("Cannot open file with invalid path: " .. target_path, vim.log.levels.ERROR)
       return
     end
+    ff_config.next_file_context_directory = M.current_dir
     M.close()
     vim.cmd("edit " .. vim.fn.fnameescape(target_path))
   end
@@ -270,6 +272,17 @@ local function go_up_directory()
   M.current_dir = parent_path
   M.selected_line = 1
   update_display()
+end
+
+local function change_working_directory()
+  local path_valid = operations.is_valid_path(M.current_dir)
+  if not path_valid then
+    vim.notify("Cannot change to directory with invalid path: " .. M.current_dir, vim.log.levels.ERROR)
+    return
+  end
+  vim.cmd("cd " .. vim.fn.fnameescape(M.current_dir))
+  ff_config.set_current_directory(M.current_dir)
+  vim.notify("Changed working directory to: " .. M.current_dir, vim.log.levels.INFO)
 end
 
 local function create_file()
@@ -408,6 +421,7 @@ function M.open()
   -- Actions
   vim.keymap.set("n", "<CR>", enter_selected, opts)
   vim.keymap.set("n", "<BS>", go_up_directory, opts)
+  vim.keymap.set("n", "<C-c>", change_working_directory, opts)
   vim.keymap.set("n", "<C-n>", create_file, opts)
   vim.keymap.set("n", "<C-f>", create_directory, opts)
   vim.keymap.set("n", "<C-d>", delete_selected, opts)

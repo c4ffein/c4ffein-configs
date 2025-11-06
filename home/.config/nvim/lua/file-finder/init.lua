@@ -4,10 +4,6 @@ local config = require("file-finder.config")
 local ui = require("file-finder.ui")
 local history = require("file-finder.history")
 
--- TODO when you add a file outside cd through the file explorer, it is still added to the current history
--- TODO you can set cd from the file explorer
--- DONE: + and - to get more and less lines per file (adjustable with M.lines_per_file, bound to +/- keys)
-
 function M.setup()
   vim.keymap.set("n", "o",     ui.start_history_only, {desc = "Find files (history only)", silent = true})
   vim.keymap.set("n", "O",     ui.start             , {desc = "Find files", silent = true})
@@ -22,7 +18,9 @@ vim.api.nvim_create_autocmd({"VimEnter", "BufReadPost", "BufEnter"}, { -- BufEnt
     opened_file = vim.fn.expand("%:p")
     if opened_file == "" then return end
     vim.fn.mkdir(config.data_path, "p")
-    history.append_to_history(config.data_file, opened_file, config.current_directory, config.MAX_SAVED_FILES)
+    local context_dir = config.next_file_context_directory or config.current_directory
+    config.next_file_context_directory = nil
+    history.append_to_history(config.data_file, opened_file, context_dir, config.MAX_SAVED_FILES)
   end
 })
 

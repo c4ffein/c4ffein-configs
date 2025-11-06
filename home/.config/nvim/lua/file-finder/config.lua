@@ -17,5 +17,6 @@ end
 M.data_path = vim.fn.stdpath("data") .. "/file-finder"
 M.data_file = vim.fn.stdpath("data") .. "/file-finder/history"
 M.set_current_directory(vim.uv.cwd())
+M.next_file_context_directory = nil
 
 return M
