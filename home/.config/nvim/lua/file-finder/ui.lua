@@ -281,8 +281,32 @@ function M.start(history_only_mode)
     end
   end
 
+  local function select_file()
+    local line_infos = M.lines_infos[selected_line]
+    if not line_infos then return end
+    M.close_windows()
+    files.open_file(line_infos.file, line_infos.line_number)
+  end
+
+  local function setup_number_keys()
+    for i = 0, 9 do
+      local local_i = i
+      local key = tostring(i)
+      if M.history_only_mode then
+        local key_callback = function() selected_line = local_i + 1; select_file() end
+        local sk = vim.api.nvim_buf_set_keymap
+        sk(M.prompt_buf, "i", key, "", { callback = key_callback, noremap = true, silent = true })
+        sk(M.main_buf,   "i", key, "", { callback = key_callback, noremap = true, silent = true })
+      else
+        pcall(vim.api.nvim_buf_del_keymap, M.prompt_buf, "i", key)
+        pcall(vim.api.nvim_buf_del_keymap, M.main_buf, "i", key)
+      end
+    end
+  end
+
   local function switch_mode()
     M.history_only_mode = not M.history_only_mode
+    setup_number_keys()
     M.set_windows_characterisitcs()
     M.reset_windows()
     set_obtained_files()
@@ -290,12 +314,6 @@ function M.start(history_only_mode)
     on_input_change(true)
   end
 
-  local function select_file()
-    local line_infos = M.lines_infos[selected_line]
-    M.close_windows()
-    files.open_file(line_infos.file, line_infos.line_number)
-  end
-  
   local function move_selection(direction)
     local display_line_count = 0
     for _, _ in pairs(M.lines_infos) do display_line_count = display_line_count + 1 end
@@ -306,7 +324,6 @@ function M.start(history_only_mode)
   end
 
   vim.api.nvim_buf_attach(M.prompt_buf, false, { on_lines = function() vim.schedule(on_input_change) end })
-
   local sk = vim.api.nvim_buf_set_keymap
   sk(M.prompt_buf, "i", "<CR>",  "", { callback = select_file,                       noremap = true, silent = true })
   sk(M.prompt_buf, "i", "<C-o>", "", { callback = switch_mode,                       noremap = true, silent = true })
@@ -317,12 +334,7 @@ function M.start(history_only_mode)
   sk(M.main_buf,   "n", "<C-o>", "", { callback = switch_mode,                       noremap = true, silent = true })
   sk(M.main_buf,   "n", "q",     "", { callback = M.close_windows,                   noremap = true, silent = true })
   sk(M.main_buf,   "n", "<Esc>", "", { callback = M.close_windows,                   noremap = true, silent = true })
-  for i = 0, 9 do
-    local local_i = i
-    key_callback = function() selected_line = local_i + 1; select_file() end
-    sk(M.prompt_buf, "i", tostring(i), "", { callback = key_callback,                noremap = true, silent = true })
-    sk(M.main_buf,   "i", tostring(i), "", { callback = key_callback,                noremap = true, silent = true })
-  end
+  setup_number_keys()
   -- Functions to adjust lines per file
   local function increase_lines_per_file()
     M.lines_per_file = math.min(M.lines_per_file + 1, config.MAX_LINES_PER_FILE)

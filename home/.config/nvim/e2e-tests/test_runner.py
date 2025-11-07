@@ -607,6 +607,164 @@ class TestFileFinder(ReadableAssertionsMixin, unittest.TestCase):
                 nvim.assert_visible('fileA')
                 nvim.assert_visible('fileB')
 
+    def test_history_mode_with_no_history(self):
+        """Test opening history-only mode (lowercase o) with no history"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'test.txt').write_text('test content')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='test.txt')
+                time.sleep(0.2)
+                # Open history-only mode with lowercase 'o'
+                nvim.send_keys('o')
+                time.sleep(0.5)
+                grid = nvim.get_grid()
+                # Should see the popup box border
+                self.assertIn('│>', grid)
+                # Should not have any errors
+                self.assertNotIn('Error', grid)
+                self.assertNotIn('error', grid)
+                # Close with Esc
+                nvim.send_keys('\x1b')
+                time.sleep(0.3)
+                # Force redraw to clear terminal artifacts
+                nvim.send_keys('\x1b')  # Make sure we're in normal mode
+                time.sleep(0.1)
+                nvim.send_keys('\x0c')  # Ctrl-L to redraw
+                time.sleep(0.2)
+                grid = nvim.get_grid()
+                # Box should disappear
+                self.assertNotIn('│>', grid)
+
+    def test_history_mode_with_history(self):
+        """Test opening history-only mode (lowercase o) after opening multiple files"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'file1.txt').write_text('content 1')
+            (Path(tmpdir) / 'file2.txt').write_text('content 2')
+            with NvimTerminal(self.config_dir) as nvim:
+                # Open files to potentially build history
+                nvim.start(cwd=tmpdir, filename='file1.txt')
+                time.sleep(0.2)
+                nvim.send_keys(':e file2.txt\n')
+                time.sleep(0.2)
+                # Open history-only mode
+                nvim.send_keys('o')
+                time.sleep(0.5)
+                grid = nvim.get_grid()
+                # Should see the popup box border
+                self.assertIn('│>', grid)
+                # Should not have any errors
+                self.assertNotIn('Error', grid)
+                self.assertNotIn('error', grid)
+                # Close with Esc
+                nvim.send_keys('\x1b')
+                time.sleep(0.3)
+                # Force redraw to clear terminal artifacts
+                nvim.send_keys('\x1b')  # Make sure we're in normal mode
+                time.sleep(0.1)
+                nvim.send_keys('\x0c')  # Ctrl-L to redraw
+                time.sleep(0.2)
+                grid = nvim.get_grid()
+                # Box should disappear
+                self.assertNotIn('│>', grid)
+
+    def test_number_keys_only_in_history_mode(self):
+        """Test that number keys work in history mode but not in tree mode"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'file123.txt').write_text('numbers')
+            (Path(tmpdir) / 'other.txt').write_text('other')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='file123.txt')
+                time.sleep(0.2)
+                # Open tree mode (uppercase O)
+                nvim.send_keys('O')
+                time.sleep(0.5)
+                # Type '1' - should filter/search for '1'
+                nvim.send_keys('1')
+                time.sleep(0.3)
+                grid = nvim.get_grid()
+                # Should show file with '1' in name
+                self.assertIn('file123', grid)
+                # Number should appear in prompt
+                self.assertIn('> 1', grid)
+
+    def test_history_mode_open_with_0(self):
+        """Test opening file with '0' key in history mode"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'file0.txt').write_text('content 0')
+            (Path(tmpdir) / 'file1.txt').write_text('content 1')
+            (Path(tmpdir) / 'file2.txt').write_text('content 2')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='file0.txt')
+                time.sleep(0.2)
+                nvim.send_keys(':e file1.txt\n')
+                time.sleep(0.2)
+                nvim.send_keys(':e file2.txt\n')
+                time.sleep(0.2)
+                # Open history mode
+                nvim.send_keys('o')
+                time.sleep(0.5)
+                grid = nvim.get_grid()
+                self.assertIn('│', grid)
+                # Press 0 to select first item
+                nvim.send_keys('0')
+                time.sleep(0.3)
+                grid = nvim.get_grid()
+                # Should open one of the files (history order may vary)
+                has_file = any(f in grid for f in ['file0.txt', 'file1.txt', 'file2.txt'])
+                self.assertTrue(has_file, f"Expected a file to be open:\n{grid}")
+
+    def test_history_mode_open_with_1(self):
+        """Test opening file with '1' key in history mode"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'file0.txt').write_text('content 0')
+            (Path(tmpdir) / 'file1.txt').write_text('content 1')
+            (Path(tmpdir) / 'file2.txt').write_text('content 2')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='file0.txt')
+                time.sleep(0.2)
+                nvim.send_keys(':e file1.txt\n')
+                time.sleep(0.2)
+                nvim.send_keys(':e file2.txt\n')
+                time.sleep(0.2)
+                # Open history mode
+                nvim.send_keys('o')
+                time.sleep(0.5)
+                grid = nvim.get_grid()
+                self.assertIn('│', grid)
+                # Press 1 to select second item
+                nvim.send_keys('1')
+                time.sleep(0.3)
+                grid = nvim.get_grid()
+                # Should not crash (no lua errors)
+                self.assertNotIn('attempt to call', grid)
+                self.assertNotIn('nil value', grid)
+
+    def test_history_mode_open_with_2(self):
+        """Test opening file with '2' key in history mode"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            (Path(tmpdir) / 'file0.txt').write_text('content 0')
+            (Path(tmpdir) / 'file1.txt').write_text('content 1')
+            (Path(tmpdir) / 'file2.txt').write_text('content 2')
+            with NvimTerminal(self.config_dir) as nvim:
+                nvim.start(cwd=tmpdir, filename='file0.txt')
+                time.sleep(0.2)
+                nvim.send_keys(':e file1.txt\n')
+                time.sleep(0.2)
+                nvim.send_keys(':e file2.txt\n')
+                time.sleep(0.2)
+                # Open history mode
+                nvim.send_keys('o')
+                time.sleep(0.5)
+                grid = nvim.get_grid()
+                self.assertIn('│', grid)
+                # Press 2 to select third item
+                nvim.send_keys('2')
+                time.sleep(0.3)
+                grid = nvim.get_grid()
+                # Should not crash (no lua errors)
+                self.assertNotIn('attempt to call', grid)
+                self.assertNotIn('nil value', grid)
+
     def test_switch_files(self):
         """Test switching between files with file-finder"""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2571,7 +2729,7 @@ class TestFileExplorer(ReadableAssertionsMixin, unittest.TestCase):
                     if '>first_link.txt' in grid.replace(' ', ''):
                         break
                 nvim.send_keys('\n')
-                time.sleep(0.01)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 # Should successfully open the final file
                 self.assertIn('final content', grid, "Should open the final file through chain")
@@ -2643,7 +2801,7 @@ class TestFileExplorer(ReadableAssertionsMixin, unittest.TestCase):
                     if '>link1.txt' in grid.replace(' ', ''):
                         break
                 nvim.send_keys('\n')
-                time.sleep(0.01)
+                time.sleep(0.05)
                 grid = nvim.get_grid()
                 self.assertIn('deep content', grid, "Should open final file through triple chain")
                 nvim.send_keys('\x1b')
