@@ -19,7 +19,7 @@ fc-cache -fv
 # installs from curl: bun + claude (claude is standalone)
 curl -fsSL https://bun.com/install | bash
 curl -fsSL https://claude.ai/install.sh | bash
-# WARNING: should create a companion script fot the current Claude Code to make the  api key workd
+# WARNING: should create a companion script for the current Claude Code to make the  api key workd
 # needs to use both "apiKeyHelper" with a command outputing the api key and the ANTHROPIC_API_KEY else doesn't work...
 
 # Librewolf config - dark theme at the cost of lower fingerprinting protection
