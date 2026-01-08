@@ -1,0 +1,29 @@
+#!/bin/sh
+
+set -e
+
+# setup flatpak repo
+flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+
+# install flatpaks
+flatpak install flathub io.gitlab.librewolf-community
+flatpak install flathub com.valvesoftware.Steam
+flatpak install flathub com.github.tchx84.FlatSeal
+flatpak install flathub com.discordapp.Discord
+
+# install fonts
+curl -Lo ~/.local/share/fonts/Hack.zip https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Hack.zip
+cd ~/.local/share/fonts && unzip Hack.zip
+fc-cache -fv
+
+# installs from curl: bun + claude (claude is standalone)
+curl -fsSL https://bun.com/install | bash
+curl -fsSL https://claude.ai/install.sh | bash
+# WARNING: should create a companion script fot the current Claude Code to make the  api key workd
+# needs to use both "apiKeyHelper" with a command outputing the api key and the ANTHROPIC_API_KEY else doesn't work...
+
+# Librewolf config - dark theme at the cost of lower fingerprinting protection
+# https://www.reddit.com/r/firefox/comments/1d9d424/dark_mode_websites_despite_resist_fingerprinting/
+# privacy.resistFingerprinting = false
+# privacy.fingerprintingProtection = true
+# privacy.fingerprintingProtection.overrides = +AllTargets,-CSSPrefersColorScheme

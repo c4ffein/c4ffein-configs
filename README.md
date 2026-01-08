@@ -1,18 +1,22 @@
 # Quick setups and config files for different environments
 
-## Home
-My portable .dotfiles, should be compatible with both Linux and MacOS, and even Windows for some
+## `home`
+My portable .dotfiles, should be compatible with both Linux and MacOS, and even Windows for most features
+The target is bootstrapping a minimalist environment with Alacritty and Neovim
 
 
-## Windows
-One script to setup a decent Windows environment from a clean install using Chocolatey
- - Checks Chocolatey installer certificate, must be sha256, thumbprint must be ok
- - No need to launch as admin, tries to elevate itself
- - Installs Firefox, Python, Atom, Cmder and git through Chocolatey
- - Installs magic-wormhole through pip
+## `bloated`
+Alternate .dotfiles for versioning my full Linux desktop - including Hyprland and scripts to install Flatpaks
 
 
-## MacOS
+## `windows`
+### Windows 10
+Legacy: Used this script to setup Windows environments from clean installs using Chocolatey
+### Windows 11
+Just installs Neovim and Alacritty through WinGet
+
+
+## `macos`
 One script to setup a NativeScript / React Native dev environment for a regular user.  
 It only requires an Admin to:
 - Install XCode
@@ -21,5 +25,5 @@ It only requires an Admin to:
 This script was made to get a dev env as fast as possible (reusing pre-built watchman, patching it with install_name_tool for example)
 
 
-## Linux
-Some of my personal scripts, still not clean
+## `linux`
+Some of my old personal scripts, still not clean

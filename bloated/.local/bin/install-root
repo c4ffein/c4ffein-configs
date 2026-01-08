@@ -1,0 +1,12 @@
+#!/bin/sh
+
+set -e
+
+apk add mesa-dri-gallium mesa-vulkan-ati vulkan-loader
+apk add pipewire-pulse pipewire-alsa
+apk add pulsemixer
+
+apk add swaybg
+apk add flatpak
+
+apk add bash  # needed for claude/bun install scripts
