@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Build a hyprcursor theme from inline SVG shapes.
+"""Build a hyprcursor theme (plus an Xcursor variant for XWayland/GTK apps) from inline SVG shapes.
 
-  ./mkcursors.py build   [--out ~/.icons] [--name Mono]   write the theme
+  ./mkcursors.py build   [--out ~/.local/share/icons] [--name Mono] [--no-xcursor] [--no-default]   write the theme
   ./mkcursors.py preview [--png preview.png]              render a contact sheet (needs chromium)
   ./mkcursors.py dump    [--dir svg]                      write the raw SVGs for hand editing
 """
-import argparse, io, math, os, subprocess, sys, zipfile, tempfile
+import argparse, io, math, os, struct, subprocess, sys, zipfile, zlib, tempfile
 
 NAME, DESC, VERSION = "Mono", "Black & white rounded cursors, generated from SVG", "0.1"
 S = 32                      # viewBox size; hyprcursor scales SVGs freely
@@ -136,8 +136,81 @@ def hotspot(sh):
         x, y = 16 + dx * math.cos(a) - dy * math.sin(a), 16 + dx * math.sin(a) + dy * math.cos(a)
     return x / S, y / S
 
+
+# ---------------------------------------------------------------- xcursor export
+# XWayland clients (Steam, wine, some Electron apps) and GTK cannot read hyprcursor,
+# so the same SVGs are rasterized through headless chromium and written as Xcursor files.
+XSIZES = (24, 32, 48, 64)
+CHROMIUM = ["chromium", "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars"]
+
+def png_decode(data):
+    """minimal PNG reader: 8-bit RGB/RGBA, non-interlaced -> (w, h, rows of RGBA bytes)"""
+    import struct as st
+    pos, idat = 8, b""
+    while pos < len(data):
+        ln = st.unpack(">I", data[pos:pos+4])[0]; typ = data[pos+4:pos+8]; body = data[pos+8:pos+8+ln]; pos += 12 + ln
+        if typ == b"IHDR": w, h, bd, ct, _, _, il = st.unpack(">IIBBBBB", body); assert bd == 8 and il == 0 and ct in (2, 6), "unexpected PNG layout"
+        elif typ == b"IDAT": idat += body
+    raw = zlib.decompress(idat); bpp = 4 if ct == 6 else 3; stride = w * bpp
+    rows, prev, q = [], bytearray(stride), 0
+    for _ in range(h):
+        ft, cur = raw[q], bytearray(raw[q+1:q+1+stride]); q += 1 + stride
+        for i in range(stride):
+            a = cur[i-bpp] if i >= bpp else 0; b = prev[i]; c = prev[i-bpp] if i >= bpp else 0
+            if ft == 1: cur[i] = (cur[i] + a) & 255
+            elif ft == 2: cur[i] = (cur[i] + b) & 255
+            elif ft == 3: cur[i] = (cur[i] + (a + b) // 2) & 255
+            elif ft == 4:
+                pa, pb, pc = abs(b - c), abs(a - c), abs(a + b - 2 * c)
+                cur[i] = (cur[i] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
+        rows.append(cur); prev = cur
+    if bpp == 3: rows = [bytearray(b"".join(bytes((r[i], r[i+1], r[i+2], 255)) for i in range(0, stride, 3))) for r in rows]
+    return w, h, rows
+
+def rasterize_all(size):
+    """render every frame of every shape at `size` in one chromium screenshot; returns {(shape, frame): rows}"""
+    items = [(n, i, fr) for n, sh in SHAPES.items() for i, fr in enumerate(frames(sh))]
+    cols = 16; nrows = -(-len(items) // cols)
+    cells = "".join(fr.replace(f'width="{S}" height="{S}"', f'width="{size}" height="{size}"') for _, _, fr in items)
+    html = f'<!doctype html><style>body{{margin:0;width:{cols*size}px;display:flex;flex-wrap:wrap}}svg{{display:block}}</style>{cells}'
+    with tempfile.TemporaryDirectory() as d:
+        hp, png = os.path.join(d, "s.html"), os.path.join(d, "s.png"); open(hp, "w").write(html)
+        subprocess.run(CHROMIUM + ["--default-background-color=00000000", f"--window-size={cols*size},{nrows*size}",
+                                   f"--screenshot={png}", "file://" + hp], check=True, capture_output=True)
+        w, h, rows = png_decode(open(png, "rb").read())
+    out = {}
+    for k, (n, i, _) in enumerate(items):
+        x0, y0 = (k % cols) * size, (k // cols) * size
+        out[(n, i)] = [rows[y0 + y][x0*4:(x0+size)*4] for y in range(size)]
+    return out
+
+def xcursor_write(path, images):
+    """images: list of (size, xhot, yhot, delay, rows)"""
+    toc, chunks, off = [], b"", 16 + 12 * len(images)
+    for size, xh, yh, delay, rows in images:
+        px = bytearray()
+        for r in rows:
+            for i in range(0, len(r), 4):
+                R, G, B, A = r[i:i+4]; px += bytes((B * A // 255, G * A // 255, R * A // 255, A))   # premultiplied BGRA
+        chunk = struct.pack("<IIIIIIIII", 36, 0xFFFD0002, size, 1, size, size, xh, yh, delay) + bytes(px)
+        toc.append(struct.pack("<III", 0xFFFD0002, size, off + len(chunks))); chunks += chunk
+    open(path, "wb").write(b"Xcur" + struct.pack("<III", 16, 0x10000, len(images)) + b"".join(toc) + chunks)
+
+def build_xcursor(root):
+    cdir = os.path.join(root, "cursors"); os.makedirs(cdir, exist_ok=True)
+    for e in os.scandir(cdir): os.unlink(e.path)
+    tiles = {z: rasterize_all(z) for z in XSIZES}
+    for n, sh in SHAPES.items():
+        hx, hy = hotspot(sh); nfr = len(frames(sh)); delay = FRAME_MS if nfr > 1 else 0
+        images = [(z, round(hx * z), round(hy * z), delay, tiles[z][(n, i)]) for i in range(nfr) for z in XSIZES]
+        images.sort(key=lambda im: im[0])            # xcursor wants sizes grouped; frames ordered within a size
+        xcursor_write(os.path.join(cdir, n), images)
+        for a in sh["alias"]:
+            if a != n: os.symlink(n, os.path.join(cdir, a))
+    print(f"wrote xcursor variant to {cdir}")
+
 # ---------------------------------------------------------------- outputs
-def build(out, name):
+def build(out, name, xcursor=True, default=True):
     root = os.path.join(out, name); cdir = os.path.join(root, "hyprcursors")
     os.makedirs(cdir, exist_ok=True)
     with open(os.path.join(root, "manifest.hl"), "w") as m:
@@ -156,6 +229,13 @@ def build(out, name):
             for i, s in enumerate(fr):
                 z.writestr(f"{n}.svg" if len(fr) == 1 else f"{n}{i}.svg", s)
     print(f"wrote {len(SHAPES)} shapes to {root}")
+    if default:   # X clients with no XCURSOR_THEME look up the theme called "default"; point it at ours
+        dd = os.path.join(out, "default"); os.makedirs(dd, exist_ok=True)
+        with open(os.path.join(dd, "index.theme"), "w") as t: t.write(f"[Icon Theme]\nName=default\nInherits={name}\n")
+        print(f"wrote {dd}/index.theme inheriting {name}")
+    if xcursor:
+        try: build_xcursor(root)
+        except FileNotFoundError: print("chromium not found: skipped the xcursor variant (XWayland/GTK apps will use their default)", file=sys.stderr)
 
 def dump(d):
     os.makedirs(d, exist_ok=True)
@@ -182,8 +262,9 @@ def preview(png):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
-    b = sub.add_parser("build"); b.add_argument("--out", default=os.path.expanduser("~/.icons")); b.add_argument("--name", default=NAME)
+    # default is ~/.local/share/icons rather than ~/.icons: flatpak only exposes the former to sandboxed apps
+    b = sub.add_parser("build"); b.add_argument("--out", default=os.path.expanduser("~/.local/share/icons")); b.add_argument("--name", default=NAME); b.add_argument("--no-xcursor", action="store_true", help="skip the rasterized Xcursor variant"); b.add_argument("--no-default", action="store_true", help="don't make this the \"default\" X cursor theme")
     p = sub.add_parser("preview"); p.add_argument("--png", default="preview.png")
     d = sub.add_parser("dump"); d.add_argument("--dir", default="svg")
     a = ap.parse_args()
-    {"build": lambda: build(a.out, a.name), "preview": lambda: preview(a.png), "dump": lambda: dump(a.dir)}[a.cmd]()
+    {"build": lambda: build(a.out, a.name, not a.no_xcursor, not a.no_default), "preview": lambda: preview(a.png), "dump": lambda: dump(a.dir)}[a.cmd]()
