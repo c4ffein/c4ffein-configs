@@ -1,0 +1,189 @@
+#!/usr/bin/env python3
+"""Build a hyprcursor theme from inline SVG shapes.
+
+  ./mkcursors.py build   [--out ~/.icons] [--name Mono]   write the theme
+  ./mkcursors.py preview [--png preview.png]              render a contact sheet (needs chromium)
+  ./mkcursors.py dump    [--dir svg]                      write the raw SVGs for hand editing
+"""
+import argparse, io, math, os, subprocess, sys, zipfile, tempfile
+
+NAME, DESC, VERSION = "Mono", "Black & white rounded cursors, generated from SVG", "0.1"
+S = 32                      # viewBox size; hyprcursor scales SVGs freely
+OUTLINE = 3                 # white stroke width; half of it shows outside the black fill
+FRAMES, FRAME_MS = 8, 90    # spinner animation
+
+# ---------------------------------------------------------------- primitives
+def pt(cx, cy, r, deg):
+    a = math.radians(deg); return (cx + r * math.cos(a), cy + r * math.sin(a))
+
+def f(x): return f"{x:.2f}".rstrip("0").rstrip(".")
+
+def annulus(cx, cy, ro, ri):
+    # inner circle wound the opposite way so it is a hole under the nonzero fill rule
+    return (f"M{f(cx-ro)} {f(cy)}a{ro} {ro} 0 1 0 {2*ro} 0a{ro} {ro} 0 1 0 {-2*ro} 0Z"
+            f"M{f(cx-ri)} {f(cy)}a{ri} {ri} 0 1 1 {2*ri} 0a{ri} {ri} 0 1 1 {-2*ri} 0Z")
+
+def arc_band(cx, cy, ro, ri, a0, a1):
+    large = 1 if (a1 - a0) % 360 > 180 else 0
+    o0, o1 = pt(cx, cy, ro, a0), pt(cx, cy, ro, a1)
+    i0, i1 = pt(cx, cy, ri, a0), pt(cx, cy, ri, a1)
+    return (f"M{f(o0[0])} {f(o0[1])}A{ro} {ro} 0 {large} 1 {f(o1[0])} {f(o1[1])}"
+            f"L{f(i1[0])} {f(i1[1])}A{ri} {ri} 0 {large} 0 {f(i0[0])} {f(i0[1])}Z")
+
+def rrect(x, y, w, h, r):
+    return f"M{f(x+r)} {f(y)}h{f(w-2*r)}a{r} {r} 0 0 1 {r} {r}v{f(h-2*r)}a{r} {r} 0 0 1 {-r} {r}h{f(-(w-2*r))}a{r} {r} 0 0 1 {-r} {-r}v{f(-(h-2*r))}a{r} {r} 0 0 1 {r} {-r}Z"
+
+def circle(cx, cy, r):
+    return f"M{f(cx-r)} {f(cy)}a{r} {r} 0 1 0 {2*r} 0a{r} {r} 0 1 0 {-2*r} 0Z"
+
+ARROW = "M3 3L3 24L8.5 19.5L12.5 28L16.5 26.2L12.5 17.8L19.5 17.8Z"
+
+def dbl_arrow(length=22, head=6, shaft=2.4):
+    """horizontal <-> centred on 16,16"""
+    l, r = 16 - length/2, 16 + length/2
+    return (f"M{f(l)} 16L{f(l+head)} {f(16-head)}L{f(l+head)} {f(16-shaft/2)}"
+            f"L{f(r-head)} {f(16-shaft/2)}L{f(r-head)} {f(16-head)}L{f(r)} 16"
+            f"L{f(r-head)} {f(16+head)}L{f(r-head)} {f(16+shaft/2)}"
+            f"L{f(l+head)} {f(16+shaft/2)}L{f(l+head)} {f(16+head)}Z")
+
+def capsule(x0, y0, x1, y1, w):
+    """thick rounded line from (x0,y0) to (x1,y1)"""
+    dx, dy = x1 - x0, y1 - y0; L = math.hypot(dx, dy); nx, ny = -dy / L * w / 2, dx / L * w / 2
+    return (f"M{f(x0+nx)} {f(y0+ny)}L{f(x1+nx)} {f(y1+ny)}A{w/2} {w/2} 0 0 1 {f(x1-nx)} {f(y1-ny)}"
+            f"L{f(x0-nx)} {f(y0-ny)}A{w/2} {w/2} 0 0 1 {f(x0+nx)} {f(y0+ny)}Z")
+
+def rot_rect(cx, cy, length, w, deg):
+    """rectangle centred on (cx,cy), long axis at deg"""
+    a = math.radians(deg); dx, dy = math.cos(a) * length / 2, math.sin(a) * length / 2
+    nx, ny = -math.sin(a) * w / 2, math.cos(a) * w / 2
+    P = [(cx - dx + nx, cy - dy + ny), (cx + dx + nx, cy + dy + ny), (cx + dx - nx, cy + dy - ny), (cx - dx - nx, cy - dy - ny)]
+    return "M" + "L".join(f"{f(x)} {f(y)}" for x, y in P) + "Z"
+
+def badge(cx, cy, r=6.5):
+    return circle(cx, cy, r)
+
+# ---------------------------------------------------------------- shapes
+# each: dict(hot=(x,y) in px, alias=[names], body=path or [frames], white=svg overlay drawn last, rot=deg)
+SHAPES = {}
+def shape(name, hot, alias, body, white="", rot=0):
+    SHAPES[name] = dict(hot=hot, alias=alias, body=body, white=white, rot=rot)
+
+# hands: finger bumps with 1.2px gaps so the white outline shows between them
+HAND = (rrect(12.4, 3, 4.2, 16, 2.1) + rrect(9, 15, 16.6, 14, 4)
+        + rrect(17.8, 11.5, 3.4, 8, 1.7) + rrect(22.4, 13.5, 3.2, 8, 1.6) + rrect(6.5, 18, 6, 6, 3))
+def fingers(tops, h):  # four finger bumps over a palm
+    xs = (8.5, 13.3, 18.1, 22.9); ws = (3.6, 3.6, 3.6, 3.4)
+    return "".join(rrect(x, t, w, h, w / 2) for x, w, t in zip(xs, ws, tops))
+GRAB = rrect(8, 14, 18.3, 14, 4) + fingers((8, 6, 7, 10), 10) + rrect(5, 17, 5, 6, 2.5)
+GRABBING = rrect(8, 15, 18.3, 13, 4) + fingers((11.5, 10, 10.5, 12.5), 7) + rrect(5, 18, 5, 6, 2.5)
+IBEAM = rrect(14.8, 4, 2.4, 24, 1.2) + rrect(10.5, 3, 11, 3, 1.5) + rrect(10.5, 26, 11, 3, 1.5)
+CROSS = (rrect(15, 3, 2, 10, 1) + rrect(15, 19, 2, 10, 1) + rrect(3, 15, 10, 2, 1) + rrect(19, 15, 10, 2, 1))
+PLUS_THICK = rrect(14.5, 5, 3, 22, 1.5) + rrect(5, 14.5, 22, 3, 1.5)
+FLEUR = (rrect(14.8, 8, 2.4, 16, 1.2) + rrect(8, 14.8, 16, 2.4, 1.2)
+         + "M16 2L11 8L21 8Z" + "M16 30L11 24L21 24Z" + "M2 16L8 11L8 21Z" + "M30 16L24 11L24 21Z")
+NOTALLOWED = annulus(16, 16, 12, 8.5) + rot_rect(16, 16, 20, 3.5, -45)
+MAGNIFIER = annulus(13, 13, 9.5, 6.5) + capsule(20, 20, 27.5, 27.5, 4.2)
+
+shape("default", (3, 3), ["left_ptr", "arrow", "top_left_arrow", "default"], ARROW)
+shape("pointer", (14.5, 3.5), ["hand2", "hand1", "hand", "pointer", "pointing_hand"], HAND)
+shape("text", (16, 16), ["xterm", "text", "ibeam"], IBEAM)
+shape("vertical-text", (16, 16), ["vertical-text"], IBEAM, rot=90)
+shape("crosshair", (16, 16), ["crosshair", "cross", "tcross"], CROSS)
+shape("cell", (16, 16), ["cell", "plus"], PLUS_THICK)
+shape("move", (16, 16), ["fleur", "move", "all-scroll", "size_all"], FLEUR)
+shape("not-allowed", (16, 16), ["not-allowed", "crossed_circle", "forbidden", "no-drop", "dnd-no-drop", "circle"], NOTALLOWED)
+shape("grab", (16, 16), ["openhand", "grab", "hand3"], GRAB)
+shape("grabbing", (16, 16), ["closedhand", "grabbing", "dnd-move", "dnd-none"], GRABBING)
+shape("ew-resize", (16, 16), ["sb_h_double_arrow", "h_double_arrow", "ew-resize", "e-resize", "w-resize", "left_side", "right_side", "size_hor"], dbl_arrow())
+shape("ns-resize", (16, 16), ["sb_v_double_arrow", "v_double_arrow", "ns-resize", "n-resize", "s-resize", "top_side", "bottom_side", "size_ver"], dbl_arrow(), rot=90)
+shape("nwse-resize", (16, 16), ["bd_double_arrow", "nwse-resize", "nw-resize", "se-resize", "top_left_corner", "bottom_right_corner", "size_fdiag"], dbl_arrow(), rot=45)
+shape("nesw-resize", (16, 16), ["fd_double_arrow", "nesw-resize", "ne-resize", "sw-resize", "top_right_corner", "bottom_left_corner", "size_bdiag"], dbl_arrow(), rot=-45)
+shape("col-resize", (16, 16), ["col-resize", "sb_h_double_arrow_bar", "split_h"], dbl_arrow(26, 5, 2) + rrect(14.9, 6, 2.2, 20, 1.1))
+shape("row-resize", (16, 16), ["row-resize", "split_v"], dbl_arrow(26, 5, 2) + rrect(14.9, 6, 2.2, 20, 1.1), rot=90)
+shape("zoom-in", (13, 13), ["zoom-in", "zoom_in"], MAGNIFIER + rrect(12.1, 9, 1.8, 8, 0.9) + rrect(9, 12.1, 8, 1.8, 0.9))
+shape("zoom-out", (13, 13), ["zoom-out", "zoom_out"], MAGNIFIER + rrect(9, 12.1, 8, 1.8, 0.9))
+
+# arrows with a badge and a white glyph on top
+Q = '<path d="M22 20.2a2.5 2.5 0 1 1 3.4 2.3c-.8.4-1 .8-1 1.5" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><circle cx="24.4" cy="26.4" r="1" fill="#fff"/>'
+shape("help", (3, 3), ["question_arrow", "help", "whats_this", "left_ptr_help"], ARROW + badge(24.5, 23.5), white=Q)
+PLUS = '<path d="M24.5 20v7M21 23.5h7" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>'
+shape("copy", (3, 3), ["copy", "dnd-copy"], ARROW + badge(24.5, 23.5), white=PLUS)
+LINK = '<path d="M21.5 26.5l5-5M23 21.5h3.5V25" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+shape("alias", (3, 3), ["alias", "dnd-link", "link"], ARROW + badge(24.5, 23.5), white=LINK)
+MENU = '<path d="M21.5 21h6M21.5 23.5h6M21.5 26h6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>'
+shape("context-menu", (3, 3), ["context-menu"], ARROW + badge(24.5, 23.5), white=MENU)
+
+# spinners: a 270 degree band rotating; 'wait' alone, 'progress' next to the arrow
+def spin(cx, cy, ro, ri, k): a = k * 360 / FRAMES; return arc_band(cx, cy, ro, ri, a, a + 270)
+shape("wait", (16, 16), ["watch", "wait"], [spin(16, 16, 11, 7, k) for k in range(FRAMES)])
+shape("progress", (3, 3), ["left_ptr_watch", "progress", "half-busy"], [ARROW + spin(23, 23, 7, 4.2, k) for k in range(FRAMES)])
+
+# ---------------------------------------------------------------- svg
+def svg(path, white="", rot=0):
+    g = f' transform="rotate({rot} 16 16)"' if rot else ""
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {S} {S}" width="{S}" height="{S}">'
+            f'<g{g}><path d="{path}" fill="none" stroke="#fff" stroke-width="{OUTLINE}" stroke-linejoin="round" stroke-linecap="round"/>'
+            f'<path d="{path}" fill="#000"/>{white}</g></svg>')
+
+def frames(sh):
+    body = sh["body"] if isinstance(sh["body"], list) else [sh["body"]]
+    return [svg(b, sh["white"], sh["rot"]) for b in body]
+
+def hotspot(sh):
+    x, y = sh["hot"]
+    if sh["rot"]:  # rotate the hotspot with the artwork
+        a = math.radians(sh["rot"]); dx, dy = x - 16, y - 16
+        x, y = 16 + dx * math.cos(a) - dy * math.sin(a), 16 + dx * math.sin(a) + dy * math.cos(a)
+    return x / S, y / S
+
+# ---------------------------------------------------------------- outputs
+def build(out, name):
+    root = os.path.join(out, name); cdir = os.path.join(root, "hyprcursors")
+    os.makedirs(cdir, exist_ok=True)
+    with open(os.path.join(root, "manifest.hl"), "w") as m:
+        m.write(f"name = {name}\ndescription = {DESC}\nversion = {VERSION}\ncursors_directory = hyprcursors\n")
+    with open(os.path.join(root, "index.theme"), "w") as t:   # lets GTK/xcursor pickers list it
+        t.write(f"[Icon Theme]\nName={name}\nComment={DESC}\n")
+    for n, sh in SHAPES.items():
+        hx, hy = hotspot(sh); fr = frames(sh)
+        meta = f"resize_algorithm = none\nhotspot_x = {hx:.4f}\nhotspot_y = {hy:.4f}\n\n"
+        meta += "".join(f"define_override = {a}\n" for a in sh["alias"] if a != n)
+        for i, _ in enumerate(fr):
+            fn = f"{n}.svg" if len(fr) == 1 else f"{n}{i}.svg"
+            meta += f"define_size = {S}, {fn}" + (f", {FRAME_MS}\n" if len(fr) > 1 else "\n")
+        with zipfile.ZipFile(os.path.join(cdir, n + ".hlc"), "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr("meta.hl", meta)
+            for i, s in enumerate(fr):
+                z.writestr(f"{n}.svg" if len(fr) == 1 else f"{n}{i}.svg", s)
+    print(f"wrote {len(SHAPES)} shapes to {root}")
+
+def dump(d):
+    os.makedirs(d, exist_ok=True)
+    for n, sh in SHAPES.items():
+        for i, s in enumerate(frames(sh)):
+            open(os.path.join(d, f"{n}{'' if i == 0 else i}.svg"), "w").write(s)
+    print(f"dumped to {d}")
+
+def preview(png):
+    sizes = (64, 32, 20)
+    cells = "".join(
+        '<div class="c"><div class="t">' + "".join(
+            f'<span style="width:{z}px;height:{z}px">{frames(sh)[0].replace(f"width=\"{S}\" height=\"{S}\"", f"width=\"{z}\" height=\"{z}\"")}</span>'
+            for z in sizes) + f'</div><small>{n}</small></div>' for n, sh in SHAPES.items())
+    html = f"""<!doctype html><meta charset=utf-8><style>
+    body{{margin:0;padding:12px;width:1176px;background:#bbb;background-image:linear-gradient(45deg,#a5a5a5 25%,transparent 25%,transparent 75%,#a5a5a5 75%),linear-gradient(45deg,#a5a5a5 25%,transparent 25%,transparent 75%,#a5a5a5 75%);background-size:24px 24px;background-position:0 0,12px 12px;font:12px/1 monospace;color:#222}}
+    .g{{display:grid;grid-template-columns:repeat(6,1fr);gap:14px 8px}} .c{{text-align:center}} .t{{display:flex;align-items:flex-end;justify-content:center;gap:8px;height:68px}} .t span{{display:inline-block}} svg{{display:block}}
+    small{{display:block;margin-top:4px}}</style><body><div class=g>{cells}</div>"""
+    with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as t: t.write(html); hp = t.name
+    subprocess.run(["chromium", "--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
+                    "--window-size=1200,720", f"--screenshot={png}", "file://" + hp],
+                   check=True, capture_output=True)
+    print("wrote", png)
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
+    b = sub.add_parser("build"); b.add_argument("--out", default=os.path.expanduser("~/.icons")); b.add_argument("--name", default=NAME)
+    p = sub.add_parser("preview"); p.add_argument("--png", default="preview.png")
+    d = sub.add_parser("dump"); d.add_argument("--dir", default="svg")
+    a = ap.parse_args()
+    {"build": lambda: build(a.out, a.name), "preview": lambda: preview(a.png), "dump": lambda: dump(a.dir)}[a.cmd]()
