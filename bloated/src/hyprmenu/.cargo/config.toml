@@ -1,0 +1,4 @@
+# Alpine's Rust host target is musl, which links statically by default; a static binary
+# cannot dlopen Mesa/libwayland, so link dynamically.
+[build]
+rustflags = ["-C", "target-feature=-crt-static"]
