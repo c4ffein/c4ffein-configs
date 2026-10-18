@@ -10,3 +10,6 @@ apk add swaybg
 apk add flatpak
 
 apk add bash  # needed for claude/bun install scripts
+
+# TODO Razer lighting: OpenRGB with the Joro/Seiren patches (see claude_playground/openrgb_patches),
+# plus a udev rule giving plugdev access to the hidraw nodes. razerctl needs that rule too.
