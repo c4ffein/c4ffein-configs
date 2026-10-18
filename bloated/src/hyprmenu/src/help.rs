@@ -20,9 +20,9 @@ pub const TEXT: &str = "\
 │ SUPER + A        Open audio mixer (pulsemixer)             │
 │ SUPER + B        Open browser (LibreWolf)                  │
 │ SUPER + C        Open Discord                              │
-│ SUPER + E        Open file manager (dolphin)               │
-│ SUPER + R        Open app launcher (hyprmenu)              │
+│ SUPER + R/Enter  Open app launcher (hyprmenu)              │
 │ SUPER + H        Show this help                            │
+│ SUPER + Space    Toggle keyboard layout (us/fr)            │
 └────────────────────────────────────────────────────────────┘
 
 ┌─ WINDOW MANAGEMENT ────────────────────────────────────────┐
@@ -30,6 +30,7 @@ pub const TEXT: &str = "\
 │ SUPER + V        Toggle floating mode                      │
 │ SUPER + P        Toggle pseudo-tiling (dwindle)            │
 │ SUPER + D        Toggle split direction (dwindle)          │
+│ SUPER + F        Maximize (SHIFT: fullscreen)              │
 │ SUPER + M        Exit Hyprland                             │
 └────────────────────────────────────────────────────────────┘
 
@@ -44,6 +45,8 @@ pub const TEXT: &str = "\
 └────────────────────────────────────────────────────────────┘
 
 ┌─ MOVE WINDOWS ─────────────────────────────────────────────┐
+│ SUPER + SHIFT + ←→↑↓   Move window in workspace            │
+│ SUPER + SHIFT + IKJL   Move window (vim-style)             │
 │ SUPER + SHIFT + 1-9/0  Move window to workspace 1-10       │
 │ SUPER + SHIFT + S      Move window to special workspace    │
 │ SUPER + LMB (drag)     Move window                         │

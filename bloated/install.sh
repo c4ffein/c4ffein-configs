@@ -23,7 +23,7 @@ PKGS="hyprland alacritty swaybg dbus pipewire wireplumber pipewire-pulse pulsemi
 # hyprmenu build and runtime (libEGL / libwayland are dlopen'ed)
 PKGS="$PKGS gcc musl-dev pkgconf freetype-dev libxkbcommon-dev
       mesa-egl mesa-gles wayland-libs-client wayland-libs-egl"
-OPTIONAL="dolphin grim slurp"          # file manager, screenshots: nice to have, not required
+OPTIONAL="grim slurp"                  # screenshots: nice to have, not required
 FONT="Hack Nerd Font"                  # alacritty + hyprmenu; install-user downloads it
 
 say()  { printf '\033[1m==> %s\033[0m\n' "$*"; }

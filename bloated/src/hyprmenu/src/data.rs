@@ -1,6 +1,5 @@
-//! Entries (flatpaks + custom), running state, launching, stopping, fuzzy matching.
+//! Entries (flatpaks + built-in), running state, launching, stopping, fuzzy matching.
 
-use serde::Deserialize;
 use std::process::{Command, Stdio};
 
 #[derive(Debug, Clone)]
@@ -16,8 +15,10 @@ impl Entry {
     pub fn running(&self) -> usize { self.instances.len() }
 }
 
-#[derive(Deserialize)]
-struct Custom { name: String, exec: String, key: Option<String> }
+/// Non-flatpak entries: (name, command, right-hand hint). Flatpaks are discovered at runtime.
+const BUILTIN: &[(&str, &str, &str)] = &[
+    ("Terminal", "alacritty", "super+t"),
+];
 
 fn capture(args: &[&str]) -> String {
     Command::new(args[0]).args(&args[1..]).stderr(Stdio::null()).output()
@@ -28,18 +29,9 @@ fn quiet(args: &[&str]) {
 }
 
 pub fn load_entries() -> Vec<Entry> {
-    let mut out = Vec::new();
-    if let Some(home) = std::env::var_os("HOME") {
-        let p = std::path::PathBuf::from(home).join(".config/hyprmenu/entries.json");
-        if let Ok(s) = std::fs::read_to_string(&p) {
-            match serde_json::from_str::<Vec<Custom>>(&s) {
-                Ok(list) => for c in list {
-                    out.push(Entry { id: format!("custom:{}", c.name), tag: c.key.unwrap_or_else(|| c.exec.clone()), name: c.name, exec: c.exec, flatpak: false, instances: vec![] });
-                },
-                Err(e) => eprintln!("entries.json: {e}"),
-            }
-        }
-    }
+    let mut out: Vec<Entry> = BUILTIN.iter().map(|&(name, exec, key)| Entry {
+        id: format!("custom:{name}"), name: name.into(), exec: exec.into(), tag: key.into(), flatpak: false, instances: vec![],
+    }).collect();
     for line in capture(&["flatpak", "list", "--app", "--columns=application,name"]).lines() {
         let mut it = line.split('\t');
         let (Some(id), name) = (it.next(), it.next()) else { continue };
